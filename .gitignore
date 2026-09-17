@@ -1,0 +1,24 @@
+node_modules/
+.env
+.env.dev
+*.log
+.DS_Store
+
+# nuxt
+.nuxt/
+.output/
+.data/
+dist/
+
+# supabase
+supabase/.temp/
+supabase/.branches/
+
+# local backups
+*.v1.bak
+
+# superseded Next.js/Hardhat prototype (kept locally, not published)
+_prototype/
+
+# local editor/agent tooling
+.claude/

@@ -1,0 +1,19 @@
+{
+  "name": "finscrypto-labs",
+  "private": true,
+  "packageManager": "pnpm@10.34.4",
+  "engines": {
+    "node": "^20.19.0 || ^22.12.0 || >=24.0.0"
+  },
+  "scripts": {
+    "dev": "pnpm --dir apps/web dev",
+    "prepare": "pnpm --dir apps/web exec nuxt prepare --dotenv ../../.env",
+    "preview": "pnpm --dir apps/web preview",
+    "build": "pnpm --filter ./apps/web build",
+    "lint": "pnpm --filter ./apps/web lint",
+    "test": "pnpm --filter ./apps/web test",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test --offline",
+    "contracts:fmt": "cd contracts && forge fmt"
+  }
+}
