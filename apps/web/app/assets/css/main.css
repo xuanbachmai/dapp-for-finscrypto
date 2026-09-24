@@ -1,2 +1,109 @@
 @import "tailwindcss";
 @import "@nuxt/ui";
+
+@font-face {
+  font-display: swap;
+  font-family: "Noto Sans JP";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/fonts/c2/noto-sans-jp-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Noto Sans JP";
+  font-style: normal;
+  font-weight: 700;
+  src: url("/fonts/c2/noto-sans-jp-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "DotGothic16";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/fonts/c2/dotgothic16-400-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "IBM Plex Mono";
+  font-style: normal;
+  font-weight: 400;
+  src: url("/fonts/c2/ibm-plex-mono-400-latin.woff2") format("woff2");
+}
+
+@font-face {
+  font-display: swap;
+  font-family: "Shippori Mincho";
+  font-style: normal;
+  font-weight: 800;
+  src: url("/fonts/c2/shippori-mincho-800-latin.woff2") format("woff2");
+}
+
+@theme {
+  --font-c2-body: "Noto Sans JP", system-ui, sans-serif;
+  --font-c2-heading: "Shippori Mincho", Georgia, serif;
+  --font-c2-nav: "DotGothic16", monospace;
+  --font-c2-code: "IBM Plex Mono", ui-monospace, monospace;
+  --color-c2-ink: #111;
+  --color-c2-paper: #fff;
+  --color-c2-surface: #eee;
+  --color-c2-link: #143fab;
+  --color-c2-action: #b71f24;
+  --color-c2-muted: #555;
+}
+
+@layer components {
+  .c2-link {
+    color: var(--color-c2-link);
+    text-decoration-line: underline;
+    text-underline-offset: 4px;
+  }
+
+  .c2-link:hover {
+    text-decoration-thickness: 2px;
+  }
+
+  .c2-link:focus-visible,
+  .c2-button:focus-visible {
+    outline: 2px solid var(--color-c2-link);
+    outline-offset: 4px;
+  }
+
+  .c2-button {
+    min-height: 44px;
+    justify-content: center;
+    border: 1px solid var(--color-c2-ink);
+    border-radius: 0;
+    background: var(--color-c2-surface);
+    padding: 12px 16px;
+    color: var(--color-c2-ink);
+    font-family: var(--font-c2-body);
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 22px;
+    box-shadow: 2px 2px 0 var(--color-c2-ink);
+  }
+
+  .c2-button:hover {
+    background: var(--color-c2-paper);
+  }
+
+  .c2-button-action {
+    background: var(--color-c2-action);
+    color: white;
+  }
+
+  .c2-button-action:hover {
+    background: #971a1e;
+  }
+
+  .c2-button:disabled {
+    cursor: not-allowed;
+    background: var(--color-c2-surface);
+    color: var(--color-c2-muted);
+    box-shadow: none;
+    opacity: 0.7;
+  }
+}

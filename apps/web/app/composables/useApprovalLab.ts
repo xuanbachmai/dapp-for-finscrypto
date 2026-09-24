@@ -2,8 +2,8 @@ import { useReadContract } from '@wagmi/vue'
 import { maxUint256 } from 'viem'
 import { computed } from 'vue'
 import { useWagmiChainWriter } from '~/lib/chain-action/wagmi'
-import { LAB_CHAIN_ID, supportedChains, type SupportedChainId } from '~/utils/chains'
-import { approvalLabChainIds, getContract } from '~/utils/contracts'
+import { LAB_CHAIN, LAB_CHAIN_ID } from '~/utils/chains'
+import { areLabContractsConfigured, createLabContracts, getLabContract, type LabContractName } from '~/utils/contracts'
 import { ApprovalLabProgressSchema, type ChainActionRequest } from '~/utils/schemas'
 import { useChainAction } from './useChainAction'
 import { useWallet } from './useWallet'
@@ -13,94 +13,153 @@ const READ_REFRESH_INTERVAL_MS = 4_000
 export function useApprovalLab() {
   const wallet = useWallet()
   const { address, isConnected } = wallet
+  const config = useRuntimeConfig()
+  const labChainId = computed(() => LAB_CHAIN_ID)
+  const labChainName = computed(() => LAB_CHAIN.name)
+  const configuredContracts = createLabContracts(config.public.labContracts)
+  const labConfigured = areLabContractsConfigured(configuredContracts)
+  const contract = (name: LabContractName) => getLabContract(configuredContracts, name)
+  const configurationError = shallowRef('')
 
-  // The lab runs on whichever lab Chain the wallet is on (local Anvil, FINSCRYPTO once
-  // deployed). Anywhere else, pages fall back to the default lab Chain and prompt a switch.
-  const labChainId = computed<SupportedChainId>(() => {
-    const current = wallet.chainId.value as SupportedChainId | undefined
-    return current && approvalLabChainIds.includes(current) ? current : LAB_CHAIN_ID
-  })
-  const labChainName = computed(() => supportedChains.find(chain => chain.id === labChainId.value)?.name ?? `Chain ${labChainId.value}`)
-  const contract = (name: string) => getContract(name, labChainId.value)
-
-  // Chain actions resolve wagmi during setup, so build one per lab Chain up front.
-  const actions = new Map(approvalLabChainIds.map(chainId => [chainId, useChainAction('approvalLab', chainId, {
+  const action = useChainAction(contract('approvalLab'), LAB_CHAIN_ID, {
     wallet,
-    writer: useWagmiChainWriter(chainId),
+    writer: useWagmiChainWriter(LAB_CHAIN_ID),
+    resolveContract: name => contract(name as LabContractName),
     messages: { submitted: 'Submitted. Waiting for confirmation...', confirmed: 'Confirmed on-chain.' },
-  })]))
-  const action = computed(() => actions.get(labChainId.value)!)
+  })
 
-  const read = (name: string, functionName: string, extra: { refetch?: boolean } = { refetch: true }) =>
+  const read = (name: LabContractName, functionName: string, extra: { refetch?: boolean } = { refetch: true }) =>
     useReadContract(computed(() => ({
       ...contract(name),
       chainId: labChainId.value,
       functionName,
       args: address.value ? [address.value] : undefined,
-      query: { enabled: Boolean(address.value), refetchInterval: extra.refetch ? READ_REFRESH_INTERVAL_MS : false },
+      query: { enabled: Boolean(address.value) && labConfigured, refetchInterval: extra.refetch ? READ_REFRESH_INTERVAL_MS : false },
     })))
 
   const progressQuery = read('approvalLab', 'progressOf')
-  const drainedQuery = read('drainerRound1', 'drainedAmount')
-  const owedRound1Query = read('drainerRound1', 'owedTo')
-  const owedRound2Query = read('drainerRound2', 'owedTo')
-  const balanceQuery = read('labAud', 'balanceOf')
-  const hasClaimedQuery = read('labAud', 'hasClaimed', { refetch: false })
+  const badgeQuery = read('approvalLab', 'badgeOf')
+  const drainedFinsQuery = read('drainerRound1', 'drainedAmount')
+  const drainedAudQuery = read('audDrainerRound1', 'drainedAmount')
+  const owedFinsRound1Query = read('drainerRound1', 'owedTo')
+  const owedFinsRound2Query = read('drainerRound2', 'owedTo')
+  const owedAudRound1Query = read('audDrainerRound1', 'owedTo')
+  const owedAudRound2Query = read('audDrainerRound2', 'owedTo')
+  const balanceQuery = read('finsToken', 'balanceOf')
+  const audBalanceQuery = read('audToken', 'balanceOf')
+  const hasClaimedQuery = read('finsToken', 'hasClaimed', { refetch: false })
 
   const progress = computed(() => {
     const parsed = ApprovalLabProgressSchema.safeParse(progressQuery.data.value)
     return parsed.success ? parsed.data : null
   })
-  const drainedAmount = computed(() => (drainedQuery.data.value as bigint | undefined) ?? 0n)
-  const owedRound1 = computed(() => (owedRound1Query.data.value as bigint | undefined) ?? 0n)
-  const owedRound2 = computed(() => (owedRound2Query.data.value as bigint | undefined) ?? 0n)
-  const owedTotal = computed(() => owedRound1.value + owedRound2.value)
-  const balance = computed(() => (balanceQuery.data.value as bigint | undefined) ?? 0n)
+  const asAmount = (value: unknown) => (value as bigint | undefined) ?? 0n
+  const drainedFins = computed(() => asAmount(drainedFinsQuery.data.value))
+  const drainedAud = computed(() => asAmount(drainedAudQuery.data.value))
+  const owedFins = computed(() => asAmount(owedFinsRound1Query.data.value) + asAmount(owedFinsRound2Query.data.value))
+  const owedAud = computed(() => asAmount(owedAudRound1Query.data.value) + asAmount(owedAudRound2Query.data.value))
+  const hasAnyOwed = computed(() => owedFins.value > 0n || owedAud.value > 0n)
+  const balance = computed(() => asAmount(balanceQuery.data.value))
+  const audBalance = computed(() => asAmount(audBalanceQuery.data.value))
+  const badgeId = computed(() => asAmount(badgeQuery.data.value))
+  const hasClaimedReward = computed(() => badgeId.value > 0n)
   const hasClaimedFaucet = computed(() => Boolean(hasClaimedQuery.data.value))
-  const hasOpenLabApproval = computed(() => (progress.value?.round1Allowance ?? 0n) > 0n || (progress.value?.round2Allowance ?? 0n) > 0n)
+  const hasOpenLabApproval = computed(() => {
+    const p = progress.value
+    return (p?.round1Allowance ?? 0n) > 0n
+      || (p?.round2Allowance ?? 0n) > 0n
+      || (p?.audRound1Allowance ?? 0n) > 0n
+      || (p?.audRound2Allowance ?? 0n) > 0n
+  })
 
-  const pendingAction = computed(() => action.value.pending.value)
-  const actionError = computed(() => action.value.error.value)
-  const actionNotice = computed(() => action.value.notice.value)
-  const isOnLabChain = computed(() => action.value.isOnSupportedChain.value)
+  const pendingAction = computed(() => action.pending.value)
+  const actionError = computed(() => configurationError.value || action.error.value)
+  const actionNotice = computed(() => action.notice.value)
+  const isOnLabChain = computed(() => action.isOnSupportedChain.value)
+
+  const queries = [
+    progressQuery,
+    badgeQuery,
+    drainedFinsQuery,
+    drainedAudQuery,
+    owedFinsRound1Query,
+    owedFinsRound2Query,
+    owedAudRound1Query,
+    owedAudRound2Query,
+    balanceQuery,
+    audBalanceQuery,
+    hasClaimedQuery,
+  ]
 
   async function refresh() {
-    await Promise.allSettled([progressQuery, drainedQuery, owedRound1Query, owedRound2Query, balanceQuery, hasClaimedQuery]
-      .map(query => query.refetch()))
+    await Promise.allSettled(queries.map(query => query.refetch()))
   }
 
   async function runAndRefresh(label: string, request: ChainActionRequest) {
-    try {
-      await action.value.run(label, request)
-      return true
-    } catch {
-      // Chain action exposes the failure through actionError for the page.
+    if (!labConfigured) {
+      configurationError.value = 'The Approval Lab contracts have not been deployed or configured on Sepolia yet.'
       return false
-    } finally {
+    }
+    configurationError.value = ''
+    try {
+      await action.run(label, request)
+      return true
+    }
+    catch {
+      return false
+    }
+    finally {
       await refresh()
     }
   }
 
-  /** Student self-service refund from every drainer that still owes them. */
+  /** Student self-service refund from every FINS and AUD drainer that still owes them. */
   async function claimRefund() {
-    const token = contract('labAud').address
-    for (const [name, owed] of [['drainerRound1', owedRound1], ['drainerRound2', owedRound2]] as const) {
-      if (owed.value > 0n && !await runAndRefresh('refund', { contract: name, functionName: 'claimRefund', args: [token] })) return false
+    const refunds: Array<{ drainer: LabContractName, owed: bigint }> = [
+      { drainer: 'drainerRound1', owed: asAmount(owedFinsRound1Query.data.value) },
+      { drainer: 'drainerRound2', owed: asAmount(owedFinsRound2Query.data.value) },
+      { drainer: 'audDrainerRound1', owed: asAmount(owedAudRound1Query.data.value) },
+      { drainer: 'audDrainerRound2', owed: asAmount(owedAudRound2Query.data.value) },
+    ]
+    for (const refund of refunds) {
+      if (refund.owed > 0n && !await runAndRefresh('refund', { contract: refund.drainer, functionName: 'claimRefund' })) return false
     }
     return true
   }
 
-  /**
-   * Sets the wallet's own allowance to zero for both lab drainers. A contract cannot do this
-   * for the Student: only the wallet that granted an approval can revoke it.
-   */
+  /** Only the Student wallet can set each FINS/AUD allowance back to zero. */
   async function revokeLabApprovals() {
-    for (const [name, allowance] of [
-      ['drainerRound1', progress.value?.round1Allowance ?? 0n],
-      ['drainerRound2', progress.value?.round2Allowance ?? 0n],
-    ] as const) {
-      if (allowance === 0n) continue
-      const ok = await runAndRefresh('revoke', { contract: 'labAud', functionName: 'approve', args: [contract(name).address, 0n] })
+    const p = progress.value
+    const approvals: Array<{ token: LabContractName, drainer: LabContractName, allowance: bigint }> = [
+      { token: 'finsToken', drainer: 'drainerRound1', allowance: p?.round1Allowance ?? 0n },
+      { token: 'finsToken', drainer: 'drainerRound2', allowance: p?.round2Allowance ?? 0n },
+      { token: 'audToken', drainer: 'audDrainerRound1', allowance: p?.audRound1Allowance ?? 0n },
+      { token: 'audToken', drainer: 'audDrainerRound2', allowance: p?.audRound2Allowance ?? 0n },
+    ]
+    for (const approval of approvals) {
+      if (approval.allowance === 0n) continue
+      const ok = await runAndRefresh('revoke', {
+        contract: approval.token,
+        functionName: 'approve',
+        args: [contract(approval.drainer).address, 0n],
+      })
+      if (!ok) return false
+    }
+    return true
+  }
+
+  async function approveRound1Lure() {
+    const approvals: Array<{ token: LabContractName, drainer: LabContractName }> = [
+      { token: 'finsToken', drainer: 'drainerRound1' },
+      { token: 'audToken', drainer: 'audDrainerRound1' },
+    ]
+
+    for (const approval of approvals) {
+      const ok = await runAndRefresh('lure-approve', {
+        contract: approval.token,
+        functionName: 'approve',
+        args: [contract(approval.drainer).address, maxUint256],
+      })
       if (!ok) return false
     }
     return true
@@ -111,18 +170,26 @@ export function useApprovalLab() {
     isConnected,
     labChainId,
     labChainName,
+    labConfigured,
     contracts: computed(() => ({
       lab: contract('approvalLab'),
-      token: contract('labAud'),
+      token: contract('finsToken'),
+      audToken: contract('audToken'),
       drainerRound1: contract('drainerRound1'),
       drainerRound2: contract('drainerRound2'),
+      audDrainerRound1: contract('audDrainerRound1'),
+      audDrainerRound2: contract('audDrainerRound2'),
     })),
     progress,
-    drainedAmount,
-    owedRound1,
-    owedRound2,
-    owedTotal,
+    drainedFins,
+    drainedAud,
+    owedFins,
+    owedAud,
+    hasAnyOwed,
     balance,
+    audBalance,
+    badgeId,
+    hasClaimedReward,
     hasClaimedFaucet,
     hasOpenLabApproval,
     pendingAction,
@@ -132,16 +199,10 @@ export function useApprovalLab() {
     refresh,
     claimRefund,
     revokeLabApprovals,
-    claimFaucet: () => runAndRefresh('faucet', { contract: 'labAud', functionName: 'claimFaucet' }),
+    claimFaucet: () => runAndRefresh('faucet', { contract: 'finsToken', functionName: 'claimFaucet' }),
     completeRecovery: () => runAndRefresh('recovery', { functionName: 'completeRecovery' }),
-    enterRound2: () => runAndRefresh('round2', { functionName: 'enterRound2' }),
-    // The lure pages. The wallet prompt is honest: unlimited approval to a drainer.
-    approveRound1Lure: () => runAndRefresh('lure-approve', {
-      contract: 'labAud', functionName: 'approve', args: [contract('drainerRound1').address, maxUint256],
-    }),
+    claimCompletionReward: () => runAndRefresh('reward', { functionName: 'claimCompletionReward' }),
+    approveRound1Lure,
     claimLure: () => runAndRefresh('lure-claim', { contract: 'fakeAirdrop', functionName: 'claim' }),
-    approveRound2Lure: () => runAndRefresh('lure-approve', {
-      contract: 'labAud', functionName: 'approve', args: [contract('drainerRound2').address, maxUint256],
-    }),
   }
 }

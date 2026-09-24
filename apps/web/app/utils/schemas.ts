@@ -100,6 +100,38 @@ export type EvidenceContractRead = z.infer<typeof EvidenceContractReadSchema>
 export const EvidenceBooleanSchema = z.boolean()
 export const EvidenceUintSchema = z.bigint().nonnegative()
 
+export const FaucetClaimSchema = z.object({
+  id: z.string().uuid(),
+  student_id: z.string().uuid(),
+  chain_id: z.number().int(),
+  amount_wei: z.string(),
+  tx_hash: z.string(),
+  created_at: z.string(),
+})
+export type FaucetClaim = z.infer<typeof FaucetClaimSchema>
+
+export const FaucetClaimRecordSchema = FaucetClaimSchema.omit({ id: true })
+export type FaucetClaimRecord = z.infer<typeof FaucetClaimRecordSchema>
+
+export const FaucetChainConfigSchema = z.object({
+  enabled: z.boolean(),
+  amountEth: z.string(),
+  cooldownMs: z.number().nonnegative(),
+})
+export type FaucetChainConfig = z.infer<typeof FaucetChainConfigSchema>
+
+export const FaucetDeniedSchema = z.discriminatedUnion('reason', [
+  z.object({ status: z.literal('denied'), reason: z.literal('cooldown'), nextClaimAt: z.string().datetime() }),
+  z.object({ status: z.literal('denied'), reason: z.enum(['disabled', 'unregistered', 'not_configured']) }),
+])
+export type FaucetDenied = z.infer<typeof FaucetDeniedSchema>
+
+export const FaucetVerdictSchema = z.union([
+  z.object({ status: z.literal('sent'), txHash: z.string() }),
+  FaucetDeniedSchema,
+])
+export type FaucetVerdict = z.infer<typeof FaucetVerdictSchema>
+
 // --- Request schemas ---
 
 export const ActivityStatusQuerySchema = z.object({
@@ -112,12 +144,17 @@ export const ActivityVerificationRequestSchema = z.object({
 })
 export type ActivityVerificationRequest = z.infer<typeof ActivityVerificationRequestSchema>
 
+export const FaucetRequestSchema = z.object({
+  walletAddress: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+  chainId: z.literal(11_155_111),
+})
+export type FaucetRequest = z.infer<typeof FaucetRequestSchema>
+
 // --- Chain runtime configuration and error verdicts ---
 
 export const ChainRuntimeConfigSchema = z.object({
-  // Added: local Anvil Chain for the standalone build.
-  localRpcUrl: z.string().optional(),
-  finscryptoRpcUrl: z.string().optional(),
+  sepoliaRpcUrl: z.string().optional(),
+  sepoliaFaucetPrivateKey: z.string().optional(),
 })
 export type ChainRuntimeConfig = z.infer<typeof ChainRuntimeConfigSchema>
 
@@ -225,9 +262,12 @@ export const ApprovalLabProgressSchema = z.object({
   round2Started: z.boolean(),
   round2Tested: z.boolean(),
   round2Passed: z.boolean(),
+  fundsRecovered: z.boolean(),
   complete: z.boolean(),
   secondsExposed: z.bigint().nonnegative(),
   round1Allowance: z.bigint().nonnegative(),
   round2Allowance: z.bigint().nonnegative(),
+  audRound1Allowance: z.bigint().nonnegative(),
+  audRound2Allowance: z.bigint().nonnegative(),
 })
 export type ApprovalLabProgress = z.infer<typeof ApprovalLabProgressSchema>

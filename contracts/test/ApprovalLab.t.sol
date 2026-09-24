@@ -2,10 +2,19 @@
 pragma solidity >=0.8.24;
 
 import "forge-std/Test.sol";
-import "../src/LabAUD.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "../src/FINSToken.sol";
 import "../src/Drainer.sol";
 import "../src/FakeAirdrop.sol";
 import "../src/ApprovalLab.sol";
+
+contract CourseAUD is ERC20 {
+    constructor() ERC20("The Australian Dollar Token", "AUD") {}
+
+    function mint(address to, uint256 amount) external {
+        _mint(to, amount);
+    }
+}
 
 contract ApprovalLabTest is Test {
     uint256 constant MAX = type(uint256).max;
@@ -16,19 +25,34 @@ contract ApprovalLabTest is Test {
     address bob = address(0xB0B);
     address carol = address(0xCA201);
 
-    LabAUD token;
+    FINSToken token;
+    CourseAUD aud;
     Drainer round1;
     Drainer round2;
+    Drainer audRound1;
+    Drainer audRound2;
     FakeAirdrop airdrop;
     ApprovalLab lab;
 
     function setUp() public {
         vm.warp(1_760_000_000);
-        token = new LabAUD(operator);
-        round1 = new Drainer(operator, address(0), "round-1");
-        round2 = new Drainer(operator, address(0), "round-2");
+        token = new FINSToken(operator);
+        aud = new CourseAUD();
+        round1 = new Drainer(operator, address(token), address(0), "round-1");
+        round2 = new Drainer(operator, address(token), address(0), "round-2");
+        audRound1 = new Drainer(operator, address(aud), address(0), "round-1: course AUD");
+        audRound2 = new Drainer(operator, address(aud), address(0), "round-2: course AUD");
         airdrop = new FakeAirdrop(address(token), address(round1));
-        lab = new ApprovalLab(operator, address(token), address(round1), address(round2));
+        lab = new ApprovalLab(
+            operator,
+            address(token),
+            address(aud),
+            address(round1),
+            address(round2),
+            address(audRound1),
+            address(audRound2)
+        );
+        token.configureCompletionMinter(address(lab));
 
         vm.prank(alice);
         token.claimFaucet();
@@ -56,7 +80,7 @@ contract ApprovalLabTest is Test {
         airdrop.claim();
         token.approve(address(round1), MAX);
         vm.stopPrank();
-        round1.sweep(_one(student), address(token));
+        round1.sweep(_one(student));
     }
 
     function _revokeAndRecover(address student) internal {
@@ -74,14 +98,19 @@ contract ApprovalLabTest is Test {
 
     function _sweepRound2(address student) internal {
         vm.roll(block.number + 1);
-        round2.sweep(_one(student), address(token));
+        round2.sweep(_one(student));
+        audRound2.sweep(_one(student));
     }
 
     function _complete(address student) internal {
+        _finishAndRecover(student);
+    }
+
+    function _finishAndRecover(address student) internal {
         _fallForRound1(student);
         _revokeAndRecover(student);
-        _enterRound2(student);
-        _sweepRound2(student);
+        vm.prank(student);
+        round1.claimRefund();
     }
 
     // --- round 1: the drain -----------------------------------------------------------
@@ -91,6 +120,39 @@ contract ApprovalLabTest is Test {
         assertEq(token.balanceOf(alice), 0, "whole balance should be taken");
         assertEq(round1.drainedAmount(alice), FAUCET);
         assertTrue(round1.hasDrained(alice));
+    }
+
+    function testDrainerCannotTouchAnUnrelatedToken() public {
+        FINSToken unrelated = new FINSToken(operator);
+        vm.startPrank(alice);
+        unrelated.claimFaucet();
+        unrelated.approve(address(round1), MAX);
+        vm.stopPrank();
+
+        round1.sweep(_one(alice));
+
+        assertEq(unrelated.balanceOf(alice), FAUCET, "unrelated token must remain untouched");
+        assertEq(unrelated.allowance(alice, address(round1)), MAX, "unrelated approval is not consumed");
+        assertEq(token.balanceOf(alice), FAUCET, "configured FINS also stays put without approval");
+        assertFalse(round1.hasDrained(alice));
+    }
+
+    function testCourseAudUsesDedicatedDrainerAndRefundAccounting() public {
+        aud.mint(alice, 750e18);
+
+        vm.startPrank(alice);
+        aud.approve(address(audRound1), MAX);
+        vm.stopPrank();
+        audRound1.sweep(_one(alice));
+
+        assertEq(aud.balanceOf(alice), 0, "approved course AUD is swept");
+        assertEq(token.balanceOf(alice), FAUCET, "FINS stays in its own drainer");
+        assertEq(audRound1.owedTo(alice), 750e18);
+
+        vm.prank(alice);
+        audRound1.claimRefund();
+        assertEq(aud.balanceOf(alice), 750e18, "every AUD is returned");
+        assertEq(audRound1.owedTo(alice), 0);
     }
 
     function testClaimRecordsAttemptButSendsNothing() public {
@@ -113,7 +175,7 @@ contract ApprovalLabTest is Test {
         token.approve(address(round1), 0);
         vm.stopPrank();
 
-        round1.sweep(_two(alice, bob), address(token));
+        round1.sweep(_two(alice, bob));
 
         assertEq(token.balanceOf(alice), 0);
         assertEq(token.balanceOf(bob), FAUCET, "bob revoked in time");
@@ -122,8 +184,8 @@ contract ApprovalLabTest is Test {
 
     function testRefundReturnsEverythingOnce() public {
         _fallForRound1(alice);
-        round1.refund(_one(alice), address(token));
-        round1.refund(_one(alice), address(token));
+        round1.refund(_one(alice));
+        round1.refund(_one(alice));
         assertEq(token.balanceOf(alice), FAUCET, "refunded exactly once");
         assertEq(round1.owedTo(alice), 0);
     }
@@ -135,7 +197,7 @@ contract ApprovalLabTest is Test {
         assertEq(round1.owedTo(alice), FAUCET);
 
         vm.prank(alice);
-        round1.claimRefund(address(token));
+        round1.claimRefund();
 
         assertEq(token.balanceOf(alice), FAUCET, "student recovered everything");
         assertEq(round1.owedTo(alice), 0);
@@ -145,28 +207,28 @@ contract ApprovalLabTest is Test {
     function testClaimRefundTwiceReverts() public {
         _fallForRound1(alice);
         vm.startPrank(alice);
-        round1.claimRefund(address(token));
+        round1.claimRefund();
         vm.expectRevert(Drainer.NothingOwed.selector);
-        round1.claimRefund(address(token));
+        round1.claimRefund();
         vm.stopPrank();
     }
 
     function testStudentNeverDrainedCannotClaim() public {
         vm.prank(bob);
         vm.expectRevert(Drainer.NothingOwed.selector);
-        round1.claimRefund(address(token));
+        round1.claimRefund();
     }
 
     function testRefundedStudentDrainedAgainIsOwedTheNewAmount() public {
         _fallForRound1(alice);
         vm.prank(alice);
-        round1.claimRefund(address(token));
+        round1.claimRefund();
 
         // Allowance is still open, so a second sweep takes the refund straight back.
-        round1.sweep(_one(alice), address(token));
+        round1.sweep(_one(alice));
         assertEq(round1.owedTo(alice), FAUCET, "second drain is owed, not lost");
 
-        round1.refund(_one(alice), address(token));
+        round1.refund(_one(alice));
         assertEq(token.balanceOf(alice), FAUCET);
         assertEq(round1.owedTo(alice), 0);
     }
@@ -175,9 +237,9 @@ contract ApprovalLabTest is Test {
         _fallForRound1(alice);
         _fallForRound1(bob);
         vm.prank(alice);
-        round1.claimRefund(address(token));
+        round1.claimRefund();
 
-        round1.refund(_two(alice, bob), address(token));
+        round1.refund(_two(alice, bob));
 
         assertEq(token.balanceOf(alice), FAUCET, "alice paid once");
         assertEq(token.balanceOf(bob), FAUCET);
@@ -186,8 +248,6 @@ contract ApprovalLabTest is Test {
 
     function testRefundDoesNotUndoLabProgress() public {
         _complete(alice);
-        vm.prank(alice);
-        round1.claimRefund(address(token));
         assertTrue(round1.hasDrained(alice), "the drain still happened");
         assertTrue(lab.hasCompleted(alice));
     }
@@ -202,7 +262,7 @@ contract ApprovalLabTest is Test {
         assertTrue(round1.isShutdown());
 
         vm.expectRevert(Drainer.DrainerShutdown.selector);
-        round1.sweep(_one(alice), address(token));
+        round1.sweep(_one(alice));
         assertEq(token.balanceOf(alice), FAUCET, "open approval is now harmless");
     }
 
@@ -217,7 +277,7 @@ contract ApprovalLabTest is Test {
         _fallForRound1(alice);
         round1.shutdown();
         vm.prank(alice);
-        round1.claimRefund(address(token));
+        round1.claimRefund();
         assertEq(token.balanceOf(alice), FAUCET);
     }
 
@@ -233,7 +293,7 @@ contract ApprovalLabTest is Test {
 
         token.mint(alice, FAUCET);
         vm.warp(block.timestamp + 1 hours);
-        round1.sweep(_one(alice), address(token));
+        round1.sweep(_one(alice));
 
         assertEq(round1.drainedAt(alice), first, "exposure is measured from the first drain");
         assertEq(round1.drainedAmount(alice), FAUCET * 2);
@@ -242,7 +302,25 @@ contract ApprovalLabTest is Test {
     function testOnlyOperatorCanSweep() public {
         vm.prank(alice);
         vm.expectRevert(Drainer.NotOperator.selector);
-        round1.sweep(_one(alice), address(token));
+        round1.sweep(_one(alice));
+    }
+
+    function testDrainerRejectsNativeEth() public {
+        vm.deal(alice, 1 ether);
+
+        vm.prank(alice);
+        (bool sent, bytes memory reason) = address(round1).call{value: 0.25 ether}("");
+
+        assertFalse(sent, "drainer must never accept Sepolia ETH");
+        assertEq(bytes4(reason), Drainer.NativeEthNotAccepted.selector);
+        assertEq(alice.balance, 1 ether, "student keeps ETH for recovery gas");
+        assertEq(address(round1).balance, 0);
+    }
+
+    function testTokenSweepDoesNotTouchStudentsNativeEth() public {
+        vm.deal(alice, 1 ether);
+        _fallForRound1(alice);
+        assertEq(alice.balance, 1 ether, "Sepolia ETH remains available for recovery gas");
     }
 
     // --- recovery ------------------------------------------------------------------
@@ -273,6 +351,37 @@ contract ApprovalLabTest is Test {
         assertEq(lab.revokedAt(alice), first, "first revoke time is kept");
     }
 
+    function testRecoveryAlsoRequiresCourseAudApprovalToBeRevoked() public {
+        aud.mint(alice, 100e18);
+        vm.prank(alice);
+        aud.approve(address(audRound1), MAX);
+        audRound1.sweep(_one(alice));
+
+        vm.prank(alice);
+        vm.expectRevert(abi.encodeWithSelector(ApprovalLab.StillApproved.selector, address(audRound1), MAX));
+        lab.completeRecovery();
+
+        vm.startPrank(alice);
+        aud.approve(address(audRound1), 0);
+        lab.completeRecovery();
+        vm.stopPrank();
+        assertTrue(lab.progressOf(alice).revoked);
+    }
+
+    function testCompletionWaitsUntilEveryDrainedAssetIsRefunded() public {
+        _fallForRound1(alice);
+        _revokeAndRecover(alice);
+
+        assertFalse(lab.progressOf(alice).fundsRecovered, "a balance is still held by the drainer");
+        assertFalse(lab.hasCompleted(alice), "no completion reward before recovery");
+
+        vm.prank(alice);
+        round1.claimRefund();
+
+        assertTrue(lab.progressOf(alice).fundsRecovered);
+        assertTrue(lab.hasCompleted(alice));
+    }
+
     // --- round 2: proving an absence --------------------------------------------------
 
     function testRound2CannotStartBeforeRecovery() public {
@@ -282,11 +391,12 @@ contract ApprovalLabTest is Test {
         lab.enterRound2();
     }
 
-    function testIncompleteWithoutEnteringRound2() public {
+    function testCompletesWithoutEnteringRound2() public {
         _fallForRound1(alice);
         _revokeAndRecover(alice);
-        _sweepRound2(alice);
-        assertFalse(lab.hasCompleted(alice));
+        vm.prank(alice);
+        round1.claimRefund();
+        assertTrue(lab.hasCompleted(alice));
     }
 
     function testNotAttackedIsUntestedNotPassed() public {
@@ -304,7 +414,7 @@ contract ApprovalLabTest is Test {
         _fallForRound1(alice);
         _revokeAndRecover(alice);
         vm.roll(block.number + 1);
-        round2.sweep(_one(bob), address(token));
+        round2.sweep(_one(bob));
         _enterRound2(alice);
 
         assertFalse(lab.progressOf(alice).round2Tested);
@@ -315,7 +425,7 @@ contract ApprovalLabTest is Test {
         _fallForRound1(alice);
         _revokeAndRecover(alice);
         _enterRound2(alice);
-        round2.sweep(_one(alice), address(token)); // same block as entering
+        round2.sweep(_one(alice)); // same block as entering
 
         assertFalse(lab.progressOf(alice).round2Tested, "the attempt must come strictly after");
     }
@@ -340,29 +450,87 @@ contract ApprovalLabTest is Test {
         _fallForRound1(alice);
         vm.warp(block.timestamp + 45);
         _revokeAndRecover(alice);
+        vm.prank(alice);
+        round1.claimRefund();
         _enterRound2(alice);
         token.mint(alice, FAUCET);
+        uint256 beforeSweep = token.balanceOf(alice);
         _sweepRound2(alice);
 
         ApprovalLab.Progress memory p = lab.progressOf(alice);
         assertTrue(p.drained && p.revoked && p.round2Tested && p.round2Passed);
         assertTrue(lab.hasCompleted(alice));
         assertEq(p.secondsExposed, 45);
-        assertEq(token.balanceOf(alice), FAUCET, "round 2 took nothing");
+        assertEq(token.balanceOf(alice), beforeSweep, "round 2 took nothing");
     }
 
-    function testReenteringRound2RequiresFreshAttempt() public {
+    function testOptionalRound2DoesNotInvalidateCompletion() public {
         _complete(alice);
         assertTrue(lab.hasCompleted(alice));
 
         _enterRound2(alice);
-        assertFalse(lab.hasCompleted(alice), "old sweep cannot vouch for the new attempt");
-
-        _sweepRound2(alice);
-        assertTrue(lab.hasCompleted(alice));
+        assertTrue(lab.hasCompleted(alice), "round 2 is not a completion requirement");
     }
 
     // --- completion ------------------------------------------------------------------
+
+    function testCompletionRewardMintsFiveHundredFinsAndSurvivorNftOnce() public {
+        _finishAndRecover(alice);
+        uint256 beforeBalance = token.balanceOf(alice);
+
+        vm.prank(alice);
+        lab.claimCompletionReward();
+
+        assertEq(token.balanceOf(alice), beforeBalance + 500e18, "500 FINS completion gift");
+        assertEq(lab.balanceOf(alice), 1, "one survivor NFT");
+        assertEq(lab.ownerOf(lab.badgeOf(alice)), alice);
+        assertTrue(bytes(lab.tokenURI(lab.badgeOf(alice))).length > 100, "on-chain NFT metadata exists");
+
+        vm.prank(alice);
+        vm.expectRevert(ApprovalLab.RewardAlreadyClaimed.selector);
+        lab.claimCompletionReward();
+    }
+
+    function testCompletionRewardCannotBeClaimedEarly() public {
+        vm.prank(alice);
+        vm.expectRevert(ApprovalLab.LabIncomplete.selector);
+        lab.claimCompletionReward();
+    }
+
+    function testSurvivorNftCannotBeTransferred() public {
+        _finishAndRecover(alice);
+        vm.prank(alice);
+        lab.claimCompletionReward();
+
+        uint256 badgeId = lab.badgeOf(alice);
+        vm.prank(alice);
+        vm.expectRevert(ApprovalLab.BadgeNonTransferable.selector);
+        lab.transferFrom(alice, bob, badgeId);
+    }
+
+    function testOnlyApprovalLabCanMintCompletionFins() public {
+        vm.prank(alice);
+        vm.expectRevert(FINSToken.NotCompletionMinter.selector);
+        token.mintCompletionReward(alice);
+    }
+
+    function testOperatorCanAirdropRewardWithoutAnotherStudentTransaction() public {
+        _finishAndRecover(alice);
+        uint256 beforeBalance = token.balanceOf(alice);
+
+        uint256 awarded = lab.airdropCompletionRewards(_two(alice, bob));
+
+        assertEq(awarded, 1, "incomplete wallets are skipped");
+        assertEq(token.balanceOf(alice), beforeBalance + 500e18);
+        assertEq(lab.ownerOf(lab.badgeOf(alice)), alice);
+        assertEq(lab.badgeOf(bob), 0);
+    }
+
+    function testStudentCannotRunCompletionAirdrop() public {
+        vm.prank(alice);
+        vm.expectRevert(ApprovalLab.NotOperator.selector);
+        lab.airdropCompletionRewards(_one(alice));
+    }
 
     function testReapprovingAfterCompletionReadsIncomplete() public {
         _complete(alice);

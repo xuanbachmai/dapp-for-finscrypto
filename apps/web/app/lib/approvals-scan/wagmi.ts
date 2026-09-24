@@ -42,7 +42,7 @@ export function createWagmiApprovalReader(config: Config, chainId: SupportedChai
     },
 
     async tokenInfo(token, owner) {
-      // Sequential reads rather than multicall: local Anvil has no Multicall3 deployed.
+      // Sequential reads avoid assuming Multicall3 is deployed on every supported course chain.
       const [symbol, decimals, balance] = await Promise.all([
         client().readContract({ address: token, abi: erc20Abi, functionName: 'symbol' }),
         client().readContract({ address: token, abi: erc20Abi, functionName: 'decimals' }),

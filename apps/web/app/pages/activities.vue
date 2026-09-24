@@ -3,12 +3,11 @@ import { ActivityStatusResponseSchema, ActivityVerificationResponseSchema } from
 import { courseActivities, type ActivityId } from '~/utils/activities'
 import { getChainBadge } from '~/utils/chain-ui'
 
-// Minimal stand-in for the platform's Activities page: same API routes and response
-// schemas, without week release, cached snapshots or confetti.
 useHead({
   title: 'Activities',
 })
 
+const config = useRuntimeConfig()
 const toast = useToast()
 const { address, isConnected } = useWallet()
 
@@ -74,7 +73,9 @@ watch(address, () => { void loadStatuses() }, { immediate: true })
         v-else-if="studentFound === false"
         class="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100"
       >
-        This wallet is not a registered Student. Locally, use one of the seeded Anvil accounts #1–#3.
+        This wallet is not registered on FINSCRYPTO.
+        <a :href="`${config.public.platformUrl}/faucet`" target="_blank" rel="noreferrer" class="font-medium underline underline-offset-4">Verify it on the course platform</a>
+        before checking Activities.
       </div>
 
       <div class="space-y-4">

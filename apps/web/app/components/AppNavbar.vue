@@ -7,6 +7,7 @@ const navLinks = [
   { label: 'Activities', to: '/activities', icon: 'i-lucide-activity' },
   { label: 'Approvals', to: '/tools/approvals', icon: 'i-lucide-shield-check' },
   { label: 'Approval Lab', to: '/labs/approval-debrief', icon: 'i-lucide-flask-conical' },
+  { label: 'ETH Faucet', to: '/faucet', icon: 'i-lucide-droplets' },
 ]
 
 function isActive(to: string) {
@@ -19,7 +20,7 @@ function isActive(to: string) {
   <nav class="fixed top-0 left-0 right-0 z-50 border-b border-gray-800 bg-gray-950/80 backdrop-blur-md">
     <div class="mx-auto grid h-16 max-w-7xl grid-cols-[auto_1fr_auto] items-center gap-4 px-4">
       <NuxtLink to="/" class="text-lg font-bold tracking-tight">
-        FINSCRYPTO
+        FINSCRYPTO <span class="text-primary">LABS</span>
       </NuxtLink>
 
       <div class="hidden items-center justify-self-center gap-1 md:flex">

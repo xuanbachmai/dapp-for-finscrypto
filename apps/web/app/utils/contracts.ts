@@ -1,52 +1,60 @@
 import type { Abi, Address } from 'viem'
+import { getAddress, isAddress, zeroAddress } from 'viem'
 import { approvalLabAbi } from './abis/approvalLab'
+import { courseAudAbi } from './abis/courseAud'
 import { drainerAbi } from './abis/drainer'
 import { fakeAirdropAbi } from './abis/fakeAirdrop'
-import { labAudAbi } from './abis/labAud'
-import type { SupportedChainId } from './chains'
+import { finsTokenAbi } from './abis/finsToken'
+
+export const labContractNames = [
+  'finsToken',
+  'audToken',
+  'drainerRound1',
+  'drainerRound2',
+  'audDrainerRound1',
+  'audDrainerRound2',
+  'fakeAirdrop',
+  'approvalLab',
+] as const
+
+export type LabContractName = (typeof labContractNames)[number]
+export type LabContractAddressInput = Partial<Record<LabContractName, string>>
 
 export interface ContractConfig {
   address: Address
   abi: Abi
 }
 
-export const contracts: Record<number, Record<string, ContractConfig>> = {
-  // Local Anvil. Addresses are deterministic for the first five deployments from Anvil
-  // account #0 on a fresh node (contracts/script/DeployApprovalLab.s.sol).
-  31337: {
-    labAud: {
-      address: '0x5FbDB2315678afecb367f032d93F642f64180aa3' as Address,
-      abi: labAudAbi as Abi,
-    },
-    drainerRound1: {
-      address: '0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512' as Address,
-      abi: drainerAbi as Abi,
-    },
-    drainerRound2: {
-      address: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0' as Address,
-      abi: drainerAbi as Abi,
-    },
-    fakeAirdrop: {
-      address: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' as Address,
-      abi: fakeAirdropAbi as Abi,
-    },
-    approvalLab: {
-      address: '0xDc64a140Aa3E981100a9becA4E685f962f0cF6C9' as Address,
-      abi: approvalLabAbi as Abi,
-    },
-  },
-  // FINSCRYPTO (36475547): add the five lab entries here after deploying with
-  // contracts/script/DeployApprovalLab.s.sol --rpc-url finscrypto. Addresses are written to
-  // contracts/deployments/approval-lab-36475547.json.
+export type LabContracts = Record<LabContractName, ContractConfig>
+
+const abis: Record<LabContractName, Abi> = {
+  finsToken: finsTokenAbi as Abi,
+  audToken: courseAudAbi as Abi,
+  drainerRound1: drainerAbi as Abi,
+  drainerRound2: drainerAbi as Abi,
+  audDrainerRound1: drainerAbi as Abi,
+  audDrainerRound2: drainerAbi as Abi,
+  fakeAirdrop: fakeAirdropAbi as Abi,
+  approvalLab: approvalLabAbi as Abi,
 }
 
-/** Chains with the Approval & Drain Lab deployed. The lab pages work on any of them. */
-export const approvalLabChainIds = Object.keys(contracts)
-  .map(Number)
-  .filter(chainId => Boolean(contracts[chainId]?.approvalLab)) as SupportedChainId[]
+/**
+ * Contract addresses are deployment data, not development defaults. Missing or malformed
+ * values become the zero address so the UI can render an explicit configuration warning
+ * without ever sending a transaction to a guessed address.
+ */
+export function createLabContracts(input: LabContractAddressInput = {}): LabContracts {
+  return Object.fromEntries(labContractNames.map((name) => {
+    const value = input[name]
+    const address = value && isAddress(value) ? getAddress(value) : zeroAddress
+    return [name, { address, abi: abis[name] }]
+  })) as LabContracts
+}
 
-export function getContract(name: string, chainId: SupportedChainId): ContractConfig {
-  const chain = contracts[chainId]
-  if (!chain?.[name]) throw new Error(`Contract ${name} not found on chain ${chainId}`)
-  return chain[name]
+export function areLabContractsConfigured(contracts: LabContracts) {
+  return labContractNames.every(name => contracts[name].address !== zeroAddress)
+}
+
+export function getLabContract(contracts: LabContracts, name: LabContractName): ContractConfig {
+  return contracts[name]
 }

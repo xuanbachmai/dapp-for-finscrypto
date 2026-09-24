@@ -1,8 +1,8 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { StudentIdentitySchema, type StudentIdentity } from '../../../app/utils/schemas'
 
-// Read-only subset of the course platform's Students store. Registration (codes, nonces,
-// wallet binding) is not part of this build; local Students come from supabase/seed.sql.
+// Read-only subset of the course platform's Students store. Registration remains on the main
+// platform; this separate dapp consumes the same verified wallet records.
 export interface StudentsStore {
   findByWallet(wallet: string): Promise<StudentIdentity | null>
 }

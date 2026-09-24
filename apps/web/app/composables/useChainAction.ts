@@ -2,14 +2,14 @@ import { computed, shallowRef } from 'vue'
 import { ChainActionError, formatWalletActionError, walletActionFailureReason } from '../lib/chain-action/errors'
 import { useWagmiChainWriter } from '../lib/chain-action/wagmi'
 import { supportedChains, type SupportedChainId } from '../utils/chains'
-import { getContract, type ContractConfig } from '../utils/contracts'
+import type { ContractConfig } from '../utils/contracts'
 import type { ChainActionHash, ChainActionRequest, ChainWriter } from '../utils/schemas'
 import { useWallet } from './useWallet'
 
 export { ChainActionError } from '../lib/chain-action/errors'
 
 export function useChainAction(
-  contract: string | ContractConfig,
+  contract: ContractConfig,
   chainId: SupportedChainId,
   options: {
     writer?: ChainWriter
@@ -19,6 +19,7 @@ export function useChainAction(
       confirmed?: string | ((label: string) => string)
       insufficientFunds?: string
     }
+    resolveContract?: (name: string) => ContractConfig
   } = {},
 ) {
   const wallet = options.wallet ?? useWallet()
@@ -29,7 +30,6 @@ export function useChainAction(
   const notice = shallowRef('')
   const txHash = shallowRef<ChainActionHash>()
   const isOnSupportedChain = computed(() => wallet.chainId.value === chainId)
-  // Local development Chains (Anvil) have no block explorer.
   const explorerUrl = computed(() => txHash.value && chain.blockExplorers
     ? `${chain.blockExplorers.default.url.replace(/\/$/, '')}/tx/${txHash.value}`
     : null)
@@ -58,8 +58,10 @@ export function useChainAction(
     try {
       await ensureWalletReady()
       const { contract: override, ...variables } = request
+      const target = override ? options.resolveContract?.(override) : contract
+      if (!target) throw new Error(`Contract ${override} is not configured.`)
       const hash = await writer.write({
-        ...(override ? getContract(override, chainId) : typeof contract === 'string' ? getContract(contract, chainId) : contract),
+        ...target,
         ...variables,
         chainId,
       })

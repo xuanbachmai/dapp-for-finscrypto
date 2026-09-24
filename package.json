@@ -12,8 +12,13 @@
     "build": "pnpm --filter ./apps/web build",
     "lint": "pnpm --filter ./apps/web lint",
     "test": "pnpm --filter ./apps/web test",
+    "db:start": "supabase start",
+    "db:status": "supabase status",
+    "db:stop": "supabase stop",
     "contracts:build": "cd contracts && forge build",
     "contracts:test": "cd contracts && forge test --offline",
-    "contracts:fmt": "cd contracts && forge fmt"
+    "contracts:fmt": "cd contracts && forge fmt",
+    "contracts:deploy:sepolia": "cd contracts && forge script script/DeployApprovalLab.s.sol --rpc-url sepolia --broadcast",
+    "contracts:operate:sepolia": "cd contracts && forge script script/SweepApprovalLab.s.sol --rpc-url sepolia --broadcast"
   }
 }

@@ -2,7 +2,7 @@ import { VueQueryPlugin } from '@tanstack/vue-query'
 import { WagmiPlugin, createConfig, http } from '@wagmi/vue'
 import { injected, walletConnect } from '@wagmi/vue/connectors'
 import { base, baseSepolia, sepolia } from 'viem/chains'
-import { finscrypto, localAnvil, supportedChains } from '~/utils/chains'
+import { supportedChains } from '~/utils/chains'
 
 type WagmiConfig = ReturnType<typeof createConfig>
 
@@ -50,8 +50,6 @@ export default defineNuxtPlugin((nuxtApp) => {
         [sepolia.id]: http(),
         [base.id]: http(),
         [baseSepolia.id]: http(),
-        [finscrypto.id]: http(finscrypto.rpcUrls.default.http[0]),
-        [localAnvil.id]: http(localAnvil.rpcUrls.default.http[0]),
       },
       ssr: true,
     })

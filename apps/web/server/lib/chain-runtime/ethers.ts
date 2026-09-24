@@ -1,12 +1,13 @@
-import { JsonRpcProvider } from 'ethers'
+import { JsonRpcProvider, Wallet } from 'ethers'
 import { ChainRuntimeConfigSchema, type ChainRuntimeConfig } from '../../../app/utils/schemas'
 import { createChainRuntime } from './index'
 
 const adapters = {
   createProvider: (rpcUrl: string) => new JsonRpcProvider(rpcUrl, undefined, { staticNetwork: true }),
+  createSigner: (privateKey: string, provider: JsonRpcProvider) => new Wallet(privateKey, provider),
 }
 
-let runtime: ReturnType<typeof createChainRuntime<JsonRpcProvider>> | undefined
+let runtime: ReturnType<typeof createChainRuntime<JsonRpcProvider, Wallet>> | undefined
 let configuration: string | undefined
 
 // Shared across route invocations, including when Nuxt returns a new config object.

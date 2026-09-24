@@ -1,16 +1,14 @@
 import type { ChainRuntimeConfig, ChainRuntimeError } from '../../../app/utils/schemas'
 
-// Same shape as the course platform's Chain runtime. The platform maps Sepolia, Base,
-// Base Sepolia and FINSCRYPTO here, with Faucet signers; this build reads local Anvil and FINSCRYPTO.
 const chains = {
-  31337: { rpcUrl: 'localRpcUrl' },
-  36475547: { rpcUrl: 'finscryptoRpcUrl' },
-} as const satisfies Record<number, { rpcUrl: keyof ChainRuntimeConfig }>
+  11155111: { rpcUrl: 'sepoliaRpcUrl', privateKey: 'sepoliaFaucetPrivateKey' },
+} as const satisfies Record<number, { rpcUrl: keyof ChainRuntimeConfig, privateKey: keyof ChainRuntimeConfig }>
 
-export function createChainRuntime<Provider extends { getNetwork(): Promise<{ chainId: bigint }> }>(
+export function createChainRuntime<Provider extends { getNetwork(): Promise<{ chainId: bigint }> }, Signer>(
   config: ChainRuntimeConfig,
   adapters: {
     createProvider(rpcUrl: string): Provider
+    createSigner(privateKey: string, provider: Provider): Signer
   },
 ) {
   const providers = new Map<number, Promise<ChainRuntimeError | { status: 'ready', provider: Provider }>>()
@@ -39,5 +37,17 @@ export function createChainRuntime<Provider extends { getNetwork(): Promise<{ ch
     return providers.get(chainId)!
   }
 
-  return { getProvider }
+  async function getFaucetSigner(chainId: number): Promise<ChainRuntimeError | { status: 'ready', signer: Signer }> {
+    const chain = chains[chainId as keyof typeof chains]
+    const privateKey = chain && config[chain.privateKey]
+    if (!privateKey) {
+      return { status: 'missing_config', chainId, setting: chain?.privateKey ?? 'chainId' }
+    }
+
+    const result = await getProvider(chainId)
+    if (result.status !== 'ready') return result
+    return { status: 'ready', signer: adapters.createSigner(privateKey, result.provider) }
+  }
+
+  return { getProvider, getFaucetSigner }
 }

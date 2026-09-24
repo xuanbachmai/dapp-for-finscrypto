@@ -1,4 +1,4 @@
-export const labAudAbi = [
+export const finsTokenAbi = [
   {
     "type": "constructor",
     "inputs": [
@@ -418,3 +418,4 @@ export const labAudAbi = [
     "inputs": []
   }
 ] as const
+

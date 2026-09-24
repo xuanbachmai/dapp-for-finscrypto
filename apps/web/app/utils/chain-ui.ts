@@ -1,4 +1,4 @@
-import { finscrypto, supportedChains, type SupportedChainId } from './chains'
+import { supportedChains, type SupportedChainId } from './chains'
 
 export interface ChainBadge {
   label: string
@@ -22,10 +22,6 @@ export function getChainLabel(chainId: SupportedChainId | number | null) {
 export function getChainBadge(chainId: number | null): ChainBadge {
   if (!chainId) {
     return { label: 'Chain TBA', color: 'neutral', variant: 'subtle', icon: 'i-lucide-network' }
-  }
-
-  if (chainId === finscrypto.id) {
-    return { label: getChainLabel(chainId), color: 'primary', variant: 'subtle', icon: 'i-lucide-network' }
   }
 
   if (chainId === 11155111) {

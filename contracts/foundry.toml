@@ -8,7 +8,6 @@ fs_permissions = [
 ]
 
 [rpc_endpoints]
-anvil = "http://127.0.0.1:8545"
-finscrypto = "https://chain.finscrypto.xyz/rpc/"
+sepolia = "${SEPOLIA_RPC_URL}"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

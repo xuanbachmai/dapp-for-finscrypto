@@ -21,7 +21,7 @@ export default defineEventHandler(async (event) => {
     students: createStudentRegistry(createSupabaseStudentsStore(supabase)),
     progress: createSupabaseProgressStore(supabase),
     evidence: createEthersEvidenceSources(getChainRuntime(config)),
-    verifiers: createActivityVerifiers(),
+    verifiers: createActivityVerifiers({ approvalLabAddress: config.public.labContracts.approvalLab }),
   })
   const verdict = await verification.verifyActivity(id, body.walletAddress).catch((error: unknown) => {
     if (isError(error)) throw error

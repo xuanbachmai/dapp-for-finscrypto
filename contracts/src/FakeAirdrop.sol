@@ -9,15 +9,16 @@ pragma solidity >=0.8.24;
  * The theft does not happen here. It happens later in `Drainer`, using the allowance the
  * lure talked the Student into signing on the way in.
  *
- * Ethics: the campaign name is invented and impersonates no real protocol, token or brand.
- * The wallet prompt stays honest; only the page lies.
+ * Ethics: the student allocation and exchange-listing promise are fictional teaching
+ * pretexts for a supervised course exercise. The wallet prompt stays honest; only the
+ * page around it lies.
  */
 contract FakeAirdrop {
     address public immutable spender;
     address public immutable token;
 
-    string public constant CAMPAIGN = "Brightfold Rewards Season 1";
-    uint256 public constant PROMISED_AMOUNT = 5_000e18;
+    string public constant CAMPAIGN = "FINS3647/FINS5547 Student Genesis Allocation";
+    uint256 public constant PROMISED_AMOUNT = 500e18;
 
     mapping(address => uint64) public claimAttemptedAt;
 
@@ -27,7 +28,10 @@ contract FakeAirdrop {
 
     event ClaimAttempted(address indexed student, uint64 timestamp, uint256 promisedAmount);
 
+    error ZeroAddress();
+
     constructor(address token_, address spender_) {
+        if (token_ == address(0) || spender_ == address(0)) revert ZeroAddress();
         token = token_;
         spender = spender_;
     }

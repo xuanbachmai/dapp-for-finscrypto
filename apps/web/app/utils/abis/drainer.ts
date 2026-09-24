@@ -8,6 +8,11 @@ export const drainerAbi = [
         "internalType": "address"
       },
       {
+        "name": "token_",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "treasury_",
         "type": "address",
         "internalType": "address"
@@ -23,13 +28,7 @@ export const drainerAbi = [
   {
     "type": "function",
     "name": "claimRefund",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -169,11 +168,6 @@ export const drainerAbi = [
         "name": "victims",
         "type": "address[]",
         "internalType": "address[]"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -213,11 +207,6 @@ export const drainerAbi = [
         "name": "victims",
         "type": "address[]",
         "internalType": "address[]"
-      },
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -232,6 +221,19 @@ export const drainerAbi = [
         "name": "",
         "type": "uint64",
         "internalType": "uint64"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "token",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IERC20"
       }
     ],
     "stateMutability": "view"
@@ -387,5 +389,10 @@ export const drainerAbi = [
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ZeroAddress",
+    "inputs": []
   }
 ] as const

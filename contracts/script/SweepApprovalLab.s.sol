@@ -4,28 +4,38 @@ pragma solidity >=0.8.24;
 import {Script, console2} from "forge-std/Script.sol";
 import {Drainer} from "../src/Drainer.sol";
 import {FakeAirdrop} from "../src/FakeAirdrop.sol";
+import {ApprovalLab} from "../src/ApprovalLab.sol";
 
 /// Staff lever for the Approval & Drain Lab. Targets every Student who clicked Claim.
 ///
 ///   ROUND=1                sweep round 1 (the drain)
-///   ROUND=2                sweep round 2 (must run, or nobody can complete the lab)
+///   ROUND=2                optional legacy second-drain exercise
 ///   ACTION=refund ROUND=n  return what that round took
 ///   ACTION=shutdown ROUND=n retire that drainer for good; refunds keep working
+///   ACTION=reward          send 500 FINS + survivor NFT to every eligible claimant
 contract SweepApprovalLab is Script {
+    uint256 internal constant SEPOLIA_CHAIN_ID = 11_155_111;
+
     function run() external {
+        require(block.chainid == SEPOLIA_CHAIN_ID, "Sepolia only");
+
         uint256 round = vm.envOr("ROUND", uint256(1));
         string memory action = vm.envOr("ACTION", string("sweep"));
+        uint256 operatorKey = vm.envUint("LAB_OPERATOR_PRIVATE_KEY");
 
         string memory path = string.concat("./deployments/approval-lab-", vm.toString(block.chainid), ".json");
         string memory json = vm.readFile(path);
 
-        address token = vm.parseJsonAddress(json, ".labAud");
         FakeAirdrop airdrop = FakeAirdrop(vm.parseJsonAddress(json, ".fakeAirdrop"));
-        Drainer drainer = Drainer(vm.parseJsonAddress(json, round == 2 ? ".drainerRound2" : ".drainerRound1"));
+        Drainer finsDrainer =
+            Drainer(payable(vm.parseJsonAddress(json, round == 2 ? ".drainerRound2" : ".drainerRound1")));
+        Drainer audDrainer =
+            Drainer(payable(vm.parseJsonAddress(json, round == 2 ? ".audDrainerRound2" : ".audDrainerRound1")));
 
         if (keccak256(bytes(action)) == keccak256("shutdown")) {
-            vm.startBroadcast();
-            drainer.shutdown();
+            vm.startBroadcast(operatorKey);
+            finsDrainer.shutdown();
+            audDrainer.shutdown();
             vm.stopBroadcast();
             console2.log("shut down drainer for round", round);
             return;
@@ -37,20 +47,34 @@ contract SweepApprovalLab is Script {
             return;
         }
 
-        vm.startBroadcast();
+        if (keccak256(bytes(action)) == keccak256("reward")) {
+            ApprovalLab lab = ApprovalLab(vm.parseJsonAddress(json, ".approvalLab"));
+            vm.startBroadcast(operatorKey);
+            uint256 awarded = lab.airdropCompletionRewards(victims);
+            vm.stopBroadcast();
+            console2.log("completion rewards sent", awarded);
+            return;
+        }
+
+        vm.startBroadcast(operatorKey);
         if (keccak256(bytes(action)) == keccak256("refund")) {
-            drainer.refund(victims, token);
+            finsDrainer.refund(victims);
+            audDrainer.refund(victims);
         } else {
-            drainer.sweep(victims, token);
+            finsDrainer.sweep(victims);
+            audDrainer.sweep(victims);
         }
         vm.stopBroadcast();
 
-        uint256 drained;
+        uint256 finsDrained;
+        uint256 audDrained;
         for (uint256 i = 0; i < victims.length; i++) {
-            if (drainer.hasDrained(victims[i])) drained++;
+            if (finsDrainer.hasDrained(victims[i])) finsDrained++;
+            if (audDrainer.hasDrained(victims[i])) audDrained++;
         }
         console2.log("round", round);
         console2.log("targets", victims.length);
-        console2.log("drained by this round (all time)", drained);
+        console2.log("FINS drained by this round (all time)", finsDrained);
+        console2.log("AUD drained by this round (all time)", audDrained);
     }
 }

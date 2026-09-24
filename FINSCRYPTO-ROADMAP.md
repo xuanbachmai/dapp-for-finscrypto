@@ -183,9 +183,8 @@ week 3 combined.
    the calldata decoded field by field, and the drain tx on Etherscan.
 6. **Recovery task:** open the Approvals Dashboard, find every outstanding
    approval on their wallet, revoke them all.
-7. **Second round:** they're sent to a *second* lure. Passing = not signing.
 
-**Also cover in the same lab (as rounds 3–4):**
+**Possible future extensions:**
 - `Permit2` / EIP-2612 gasless signature — no gas, no popup weight, same drain.
 - `setApprovalForAll` on their Pixel Art NFTs.
 - Blind `eth_sign` of an opaque hash.
@@ -205,20 +204,12 @@ week 3 combined.
   after the course. Ship it as a headline item under Resources.
 
 **Verification** **[rev]**
-*Round 2 originally passed on "recorded a connect with no approval signature".
-A wallet connect is off-chain, so that completion is not provable from chain
-state — it breaks design principle #4. Anchor the absence to an on-chain event
-the student writes themselves:*
-
 Complete when, for the student's registered wallet:
-- ≥1 `Approval` to the drainer with a non-zero allowance exists in history, AND
+- the first-round drainer recorded a successful token drain, AND
 - current allowance to every lab spender is 0 (they revoked), AND
-- the student called `enterRound2()` on the lab contract — cheap, no approval,
-  emits `Round2Started(student, timestamp)` — AND
-- no `Approval` to the round-2 spender exists within 256 blocks of that event.
+- the student confirmed recovery on-chain, AND
+- every token owed by the lab has been returned.
 
-Absence is now provable, because it is measured against an on-chain timestamp
-that only the student could have produced.
 Score = seconds between drain tx and first revoke tx (lower is better).
 
 **Ethics guardrails** — non-negotiable
@@ -598,9 +589,9 @@ lending machinery, opposite failure mode.
       not installed on the build machine and Hardhat installs from npm with no
       extra toolchain. Solidity ^0.8.20 with standard OZ imports either way, so
       this stays reversible if the live repo says otherwise.
-- [x] ~~Frontend stack confirmation~~ **Next.js (App Router) + wagmi/viem +
-      TypeScript**, scaffolded standalone for later merge into the live site.
-      Route paths above hold.
+- [x] ~~Frontend stack confirmation~~ **Nuxt 3 + Vue + Nuxt UI + wagmi/viem +
+      TypeScript**, implemented as a separately deployable dapp that uses the
+      Ethereum Sepolia and existing FINSCRYPTO platform conventions. Route paths above hold.
 
 **Still open — Mike**
 
@@ -626,11 +617,10 @@ When implementing any module from this file:
 
 - Read the existing DApp implementations first and **match their patterns** —
   the verification flow, the wallet-connect wrapper, the activity-page layout.
-  Consistency matters more than novelty here. **[rev]** Where new work is
-  scaffolded standalone (as phase 1 is), keep the seams shallow and few: one
-  wallet provider, one activity-page layout, one verification hook. Re-pointing
-  three files at the live site's equivalents is a merge; re-pointing thirty is a
-  rewrite.
+  Consistency matters more than novelty here. **[rev]** The risk lab is a
+  separate dapp; its contracts use Sepolia while it keeps the FINSCRYPTO wallet setup,
+  student records and activity-verification shapes. Use public Sepolia ETH faucets. Keep those
+  integration seams explicit and environment-driven.
 - Every new contract needs a matching entry in `/resources` (address + explorer
   link) — students are told to verify everything, so make it verifiable.
 - Every new activity needs: a DApp page, an activity entry with steps, a

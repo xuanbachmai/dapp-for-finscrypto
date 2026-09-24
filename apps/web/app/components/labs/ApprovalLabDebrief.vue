@@ -8,21 +8,28 @@ const {
   progress,
   labChainId,
   labChainName,
-  drainedAmount,
-  owedTotal,
+  drainedFins,
+  drainedAud,
+  owedFins,
+  owedAud,
+  hasAnyOwed,
   balance,
+  audBalance,
+  badgeId,
+  hasClaimedReward,
   hasClaimedFaucet,
   hasOpenLabApproval,
   pendingAction,
   actionError,
   actionNotice,
   isOnLabChain,
+  labConfigured,
   refresh,
   claimFaucet,
   completeRecovery,
-  enterRound2,
   claimRefund,
   revokeLabApprovals,
+  claimCompletionReward,
 } = useApprovalLab()
 const { switchChain } = useWallet()
 
@@ -37,16 +44,22 @@ const steps = computed(() => {
   return [
     { key: 'drained', done: Boolean(p?.drained), title: 'Round 1: you signed the approval and were drained', detail: 'The only step you complete by failing.' },
     { key: 'revoked', done: Boolean(p?.revoked), title: 'Recovery: revoke every lab approval, then confirm', detail: 'Your exposure time runs from the drain to this confirmation.' },
-    { key: 'round2Started', done: Boolean(p?.round2Started), title: 'Round 2: start it, then visit the second lure', detail: 'Starting writes a block number on-chain. That block is what makes “you did not sign” provable later.' },
-    { key: 'round2Tested', done: Boolean(p?.round2Tested), title: 'Round 2 tested: staff ran the drain attempt', detail: p?.round2Started && !p.round2Tested ? 'Waiting for staff. Not being attacked is not the same as resisting an attack, so this cannot pass until the attempt runs.' : 'The attempt ran after you started.' },
-    { key: 'round2Passed', done: Boolean(p?.round2Passed), title: 'Round 2 passed: it came away with nothing', detail: p?.round2Tested && !p.round2Passed ? 'It got you again. Revoke, confirm, and start round 2 again.' : 'You refused the second signature.' },
-    { key: 'complete', done: Boolean(p?.complete), title: 'Complete: verify on the Activities page', detail: p?.complete ? `Exposure: ${p.secondsExposed} seconds between the drain and your confirmed revoke.` : 'Every lab allowance must also still be zero when you verify.' },
+    { key: 'fundsRecovered', done: Boolean(p?.fundsRecovered), title: 'Recovery: take every FINS and AUD token back', detail: p?.fundsRecovered ? 'The lab no longer owes you any tokens.' : 'Sepolia ETH stays in your wallet so you can pay for this recovery transaction.' },
+    { key: 'complete', done: Boolean(p?.complete), title: 'Complete: collect your reward and verify', detail: p?.complete ? `Exposure: ${p.secondsExposed} seconds between the drain and your confirmed revoke.` : 'Every lab allowance must be zero and every drained token returned.' },
   ]
 })
 </script>
 
 <template>
   <div class="space-y-6">
+    <div
+      v-if="!labConfigured"
+      class="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-100"
+    >
+      <p class="font-medium text-white">Sepolia deployment required.</p>
+      <p class="mt-1">The dapp is configured for Sepolia, but its FINS/AUD lab contract addresses have not all been added yet.</p>
+    </div>
+
     <UCard v-if="!isConnected" class="border border-white/10 bg-slate-950/70">
       <p class="text-sm text-gray-400">Connect your registered wallet from the navigation bar to see your lab progress.</p>
     </UCard>
@@ -66,17 +79,21 @@ const steps = computed(() => {
         v-if="progress?.drained"
         class="rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200"
       >
-        <p class="font-medium text-white">{{ formatTokenAmount(drainedAmount, 18) }} LAUD was taken from your wallet.</p>
+        <p class="font-medium text-white">
+          {{ formatTokenAmount(drainedFins, 18) }} FINS<span v-if="drainedAud > 0n"> and {{ formatTokenAmount(drainedAud, 18) }} AUD</span> was taken from your wallet.
+        </p>
         <p class="mt-1">It is owed back to you. In the real version of this, that sentence does not appear.</p>
       </div>
 
-      <UCard v-if="owedTotal > 0n || hasOpenLabApproval" class="border border-white/10 bg-slate-950/70">
+      <UCard v-if="hasAnyOwed || hasOpenLabApproval" class="border border-white/10 bg-slate-950/70">
         <div class="flex flex-wrap items-center justify-between gap-4">
           <div class="min-w-0">
             <h2 class="font-semibold text-white">Undo the damage</h2>
             <p class="mt-1 text-sm text-gray-400">
-              <template v-if="owedTotal > 0n">The lab owes you {{ formatTokenAmount(owedTotal, 18) }} LAUD. </template>
-              <template v-if="hasOpenLabApproval">A lab drainer can still move your LAUD; revoke first, or a refund can be swept straight back.</template>
+              <template v-if="hasAnyOwed">
+                The lab owes you <span v-if="owedFins > 0n">{{ formatTokenAmount(owedFins, 18) }} FINS</span><span v-if="owedFins > 0n && owedAud > 0n"> and </span><span v-if="owedAud > 0n">{{ formatTokenAmount(owedAud, 18) }} AUD</span>.
+              </template>
+              <template v-if="hasOpenLabApproval"> A lab drainer can still move an approved token; revoke first, or a refund can be swept straight back.</template>
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
@@ -87,15 +104,15 @@ const steps = computed(() => {
               icon="i-lucide-shield-off"
               label="Revoke lab approvals"
               :loading="pendingAction === 'revoke'"
-              :disabled="pendingAction !== null"
+              :disabled="!labConfigured || pendingAction !== null"
               @click="void revokeLabApprovals()"
             />
             <UButton
-              v-if="owedTotal > 0n"
+              v-if="hasAnyOwed"
               icon="i-lucide-undo-2"
-              label="Get my LAUD back"
+              label="Get my FINS + AUD back"
               :loading="pendingAction === 'refund'"
-              :disabled="pendingAction !== null"
+              :disabled="!labConfigured || pendingAction !== null"
               @click="void claimRefund()"
             />
           </div>
@@ -111,33 +128,31 @@ const steps = computed(() => {
 
       <div class="grid gap-4 md:grid-cols-3">
         <UCard class="border border-white/10 bg-slate-950/70">
-          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">LAUD balance</p>
+          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">FINS balance</p>
           <p class="mt-3 text-3xl font-semibold text-white">{{ formatTokenAmount(balance, 18) }}</p>
           <UButton
             v-if="!hasClaimedFaucet"
             class="mt-3"
             size="sm"
             icon="i-lucide-droplets"
-            label="Claim 5,000 LAUD"
+            label="Claim 5,000 FINS"
             :loading="pendingAction === 'faucet'"
-            :disabled="pendingAction !== null"
+            :disabled="!labConfigured || pendingAction !== null"
             @click="void claimFaucet()"
           />
           <p v-else class="mt-2 text-sm text-gray-400">A worthless lab token. Refunded after the session.</p>
         </UCard>
         <UCard class="border border-white/10 bg-slate-950/70">
-          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Round-1 drainer allowance</p>
-          <p class="mt-3 text-2xl font-semibold" :class="(progress?.round1Allowance ?? 0n) > 0n ? 'text-red-300' : 'text-white'">
-            {{ (progress?.round1Allowance ?? 0n) > 0n ? 'Still open' : 'Zero' }}
-          </p>
-          <p class="mt-2 font-mono text-xs text-gray-500">{{ contracts.drainerRound1.address }}</p>
+          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Course AUD balance</p>
+          <p class="mt-3 text-3xl font-semibold text-white">{{ formatTokenAmount(audBalance, 18) }}</p>
+          <p class="mt-2 text-sm text-gray-400">Existing Sepolia AUD, including the course AUD/ETH liquidity exercise.</p>
         </UCard>
         <UCard class="border border-white/10 bg-slate-950/70">
-          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Round-2 drainer allowance</p>
-          <p class="mt-3 text-2xl font-semibold" :class="(progress?.round2Allowance ?? 0n) > 0n ? 'text-red-300' : 'text-white'">
-            {{ (progress?.round2Allowance ?? 0n) > 0n ? 'Still open' : 'Zero' }}
+          <p class="text-xs uppercase tracking-[0.18em] text-gray-500">Round-1 allowances</p>
+          <p class="mt-3 text-2xl font-semibold" :class="(progress?.round1Allowance ?? 0n) > 0n || (progress?.audRound1Allowance ?? 0n) > 0n ? 'text-red-300' : 'text-white'">
+            {{ (progress?.round1Allowance ?? 0n) > 0n || (progress?.audRound1Allowance ?? 0n) > 0n ? 'Still open' : 'Zero' }}
           </p>
-          <p class="mt-2 font-mono text-xs text-gray-500">{{ contracts.drainerRound2.address }}</p>
+          <p class="mt-2 text-xs text-gray-500">Separate immutable FINS and AUD spenders</p>
         </UCard>
       </div>
 
@@ -166,26 +181,67 @@ const steps = computed(() => {
                   size="sm"
                   label="Confirm revoked"
                   :loading="pendingAction === 'recovery'"
-                  :disabled="!progress?.drained || pendingAction !== null"
+                  :disabled="!labConfigured || !progress?.drained || pendingAction !== null"
                   @click="void completeRecovery()"
                 />
               </div>
 
-              <div v-if="step.key === 'round2Started'" class="mt-3 flex flex-wrap gap-2">
+              <div v-if="step.key === 'fundsRecovered' && !step.done && hasAnyOwed" class="mt-3">
                 <UButton
                   size="sm"
-                  :label="progress?.round2Started ? 'Restart round 2' : 'Start round 2'"
-                  :loading="pendingAction === 'round2'"
-                  :disabled="!progress?.revoked || pendingAction !== null"
-                  @click="void enterRound2()"
+                  icon="i-lucide-undo-2"
+                  label="Return every course token"
+                  :loading="pendingAction === 'refund'"
+                  :disabled="hasOpenLabApproval || pendingAction !== null"
+                  @click="void claimRefund()"
                 />
-                <UButton v-if="progress?.round2Started" to="/labs/verify-wallet" size="sm" variant="soft" label="Go to the second lure" />
+                <p v-if="hasOpenLabApproval" class="mt-2 text-xs text-amber-300">Revoke the open approvals first.</p>
               </div>
 
-              <UButton v-if="step.key === 'complete' && step.done" to="/activities" class="mt-3" size="sm" icon="i-lucide-badge-check" label="Verify Activity" />
+              <div v-if="step.key === 'complete' && step.done" class="mt-3 flex flex-wrap gap-2">
+                <UButton
+                  v-if="!hasClaimedReward"
+                  size="sm"
+                  icon="i-lucide-gift"
+                  label="Claim 500 FINS + survivor NFT"
+                  :loading="pendingAction === 'reward'"
+                  :disabled="pendingAction !== null"
+                  @click="void claimCompletionReward()"
+                />
+                <UButton to="/activities" size="sm" variant="outline" icon="i-lucide-badge-check" label="Verify Activity" />
+              </div>
             </div>
           </li>
         </ol>
+      </UCard>
+
+      <UCard v-if="progress?.complete" class="overflow-hidden border border-white/10 bg-slate-950/70">
+        <div class="grid items-center gap-6 md:grid-cols-[minmax(220px,360px)_1fr]">
+          <img
+            src="/nft/i-survived-a-hack.png"
+            alt="I Survived a Hack FINSCRYPTO Labs completion badge"
+            class="aspect-square w-full border border-white/10 bg-white object-cover"
+          >
+          <div>
+            <p class="text-xs uppercase tracking-[0.18em] text-primary">Completion airdrop</p>
+            <h2 class="mt-2 text-2xl font-semibold text-white">I Survived a Hack</h2>
+            <p class="mt-2 text-sm leading-6 text-gray-400">
+              Your reward transaction mints 500 valueless course FINS and a non-transferable Sepolia NFT. The NFT metadata and final artwork are stored fully on-chain.
+            </p>
+            <p v-if="hasClaimedReward" class="mt-4 text-sm font-medium text-emerald-300">
+              Reward claimed · survivor badge #{{ badgeId }}
+            </p>
+            <UButton
+              v-else
+              class="mt-4"
+              icon="i-lucide-gift"
+              label="Claim completion airdrop"
+              :loading="pendingAction === 'reward'"
+              :disabled="pendingAction !== null"
+              @click="void claimCompletionReward()"
+            />
+          </div>
+        </div>
       </UCard>
     </template>
 
@@ -208,11 +264,11 @@ const steps = computed(() => {
         </div>
         <div class="grid gap-1 md:grid-cols-[8rem_1fr]">
           <dt class="font-mono text-primary">arg 2</dt>
-          <dd class="text-gray-300"><code>2²⁵⁶ − 1</code>. Not 5,000 and not your balance: every token of this kind you hold now or later, until you revoke.</dd>
+          <dd class="text-gray-300"><code>2²⁵⁶ − 1</code>. Not 500 FINS and not your current balance: every token covered by that FINS or AUD approval, now or later, until you revoke.</dd>
         </div>
       </dl>
       <p class="mt-4 text-sm text-gray-400">
-        Nothing here is a bug. ERC-20 worked exactly as specified. The vulnerability was the thirty seconds of trust the page bought.
+        Nothing here is a bug. ERC-20 worked exactly as specified. Sepolia ETH was never approved or transferred; it stayed available for your recovery gas. The vulnerability was the thirty seconds of trust the page bought.
       </p>
     </UCard>
 

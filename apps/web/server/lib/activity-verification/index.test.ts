@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import { courseActivities, getCourseActivity } from '../../../app/utils/activities'
-import { getContract } from '../../../app/utils/contracts'
 import { ActivityVerificationResponseSchema } from '../../../app/utils/schemas'
 import { createStudentRegistry } from '../student-registry'
 import { createInMemoryStudentsStore } from '../student-registry/store'
@@ -16,15 +15,17 @@ const student = {
   verified_at: '2026-09-12T00:00:00.000Z', created_at: '2026-09-11T00:00:00.000Z',
 }
 const verifiedAt = '2026-09-28T01:00:00.000Z'
+const chainId = 11_155_111
+const approvalLabAddress = '0x0000000000000000000000000000000000000a11'
 const labRead = {
-  address: getContract('approvalLab', 31337).address, functionName: 'hasCompleted', abi: [], args: [wallet],
+  address: approvalLabAddress, functionName: 'hasCompleted', abi: [], args: [wallet],
 }
 
 function setup(registered = true) {
   const evidence = createInMemoryEvidenceSources()
   const progress = createInMemoryProgressStore()
   const students = createStudentRegistry(createInMemoryStudentsStore(registered ? [student] : []))
-  const verifiers = createActivityVerifiers()
+  const verifiers = createActivityVerifiers({ approvalLabAddress })
   const verification = createActivityVerification({ students, progress, evidence, verifiers, now: () => new Date(verifiedAt) })
   return { ...verification, evidence, progress, verifiers }
 }
@@ -32,24 +33,24 @@ function setup(registered = true) {
 describe('Approval & Drain Lab Activity verification', () => {
   it('verifies only once ApprovalLab reports the wallet complete', async () => {
     const scenario = setup()
-    scenario.evidence.setContractRead(31337, labRead, false)
+    scenario.evidence.setContractRead(chainId, labRead, false)
     expect(await scenario.verifyActivity('approval-drain-lab', wallet)).toEqual({
       status: 'NotCompleted', message: getCourseActivity('approval-drain-lab')!.notCompletedMessage,
     })
     expect(await scenario.progress.listVerified(student.id)).toEqual([])
 
-    scenario.evidence.setContractRead(31337, labRead, true)
+    scenario.evidence.setContractRead(chainId, labRead, true)
     expect(await scenario.verifyActivity('approval-drain-lab', wallet)).toEqual({ status: 'Verified', verifiedAt })
     expect(await scenario.progress.listVerified(student.id)).toEqual([{
-      student_id: student.id, activity_type: 'approval_lab', chain_id: 31337, verified_at: verifiedAt,
+      student_id: student.id, activity_type: 'approval_lab', chain_id: chainId, verified_at: verifiedAt,
     }])
   })
 
   it('keeps earned Progress when the wallet later re-approves a lab drainer', async () => {
     const scenario = setup()
-    scenario.evidence.setContractRead(31337, labRead, true)
+    scenario.evidence.setContractRead(chainId, labRead, true)
     await scenario.verifyActivity('approval-drain-lab', wallet)
-    scenario.evidence.setContractRead(31337, labRead, false)
+    scenario.evidence.setContractRead(chainId, labRead, false)
     expect((await scenario.verifyActivity('approval-drain-lab', wallet)).status).toBe('NotCompleted')
     expect(await scenario.progress.listVerified(student.id)).toHaveLength(1)
   })
@@ -61,14 +62,14 @@ describe('Approval & Drain Lab Activity verification', () => {
 
   it('propagates a failed Chain read without recording Progress', async () => {
     const scenario = setup()
-    scenario.evidence.setContractRead(31337, labRead, new Error('RPC unavailable'))
+    scenario.evidence.setContractRead(chainId, labRead, new Error('RPC unavailable'))
     await expect(scenario.verifyActivity('approval-drain-lab', wallet)).rejects.toThrow('RPC unavailable')
     expect(await scenario.progress.listVerified(student.id)).toEqual([])
   })
 
   it('rejects a malformed contract result rather than recording Progress', async () => {
     const scenario = setup()
-    scenario.evidence.setContractRead(31337, labRead, 'true')
+    scenario.evidence.setContractRead(chainId, labRead, 'true')
     await expect(scenario.verifyActivity('approval-drain-lab', wallet)).rejects.toThrow()
     expect(await scenario.progress.listVerified(student.id)).toEqual([])
   })

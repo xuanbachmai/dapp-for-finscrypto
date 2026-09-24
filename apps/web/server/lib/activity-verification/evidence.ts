@@ -10,7 +10,7 @@ export interface EvidenceProvider {
 
 export class ExplorerUnavailableError extends Error {
   constructor() {
-    super('Unable to load FINSCRYPTO activity history from the explorer.')
+    super('Unable to load Sepolia activity history from the RPC provider.')
   }
 }
 
