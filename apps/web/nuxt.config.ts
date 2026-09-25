@@ -64,6 +64,7 @@ export default defineNuxtConfig({
         audDrainerRound2: process.env.NUXT_PUBLIC_AUD_DRAINER_ROUND2_ADDRESS || '',
         fakeAirdrop: process.env.NUXT_PUBLIC_FAKE_AIRDROP_ADDRESS || '',
         approvalLab: process.env.NUXT_PUBLIC_APPROVAL_LAB_ADDRESS || '',
+        survivorBadge: process.env.NUXT_PUBLIC_SURVIVOR_BADGE_ADDRESS || '',
       },
     },
   },

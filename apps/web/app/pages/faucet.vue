@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { LAB_CHAIN, LAB_CHAIN_ID } from '~/utils/chains'
 
-useHead({ title: 'Sepolia ETH Faucet | FINSCRYPTO Labs' })
+useHead({ title: 'Sepolia ETH Faucet | FINSCRYPTO.XYZ' })
 
 const { address, chainId, isConnected, connect, switchChain } = useWallet()
 const copied = ref(false)

@@ -4,7 +4,7 @@ pragma solidity >=0.8.24;
 import {Script, console2} from "forge-std/Script.sol";
 import {Drainer} from "../src/Drainer.sol";
 import {FakeAirdrop} from "../src/FakeAirdrop.sol";
-import {ApprovalLab} from "../src/ApprovalLab.sol";
+import {SurvivorBadge} from "../src/SurvivorBadge.sol";
 
 /// Staff lever for the Approval & Drain Lab. Targets every Student who clicked Claim.
 ///
@@ -48,9 +48,9 @@ contract SweepApprovalLab is Script {
         }
 
         if (keccak256(bytes(action)) == keccak256("reward")) {
-            ApprovalLab lab = ApprovalLab(vm.parseJsonAddress(json, ".approvalLab"));
+            SurvivorBadge badge = SurvivorBadge(vm.parseJsonAddress(json, ".survivorBadge"));
             vm.startBroadcast(operatorKey);
-            uint256 awarded = lab.airdropCompletionRewards(victims);
+            uint256 awarded = badge.airdrop(victims);
             vm.stopBroadcast();
             console2.log("completion rewards sent", awarded);
             return;

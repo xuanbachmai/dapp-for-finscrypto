@@ -1,4 +1,4 @@
-# ADR-001: Integrate FINSCRYPTO Labs as a separate dapp
+# ADR-001: Integrate FINSCRYPTO.XYZ as a separate dapp
 
 **Status:** Accepted; amended for Sepolia on 2026-09-22  
 **Date:** 2026-09-21  

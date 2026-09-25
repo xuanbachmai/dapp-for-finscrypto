@@ -7,6 +7,7 @@ const navLinks = [
   { label: 'Activities', to: '/activities', icon: 'i-lucide-activity' },
   { label: 'Approvals', to: '/tools/approvals', icon: 'i-lucide-shield-check' },
   { label: 'Approval Lab', to: '/labs/approval-debrief', icon: 'i-lucide-flask-conical' },
+  { label: 'Survivor Badge', to: '/labs/survivor-badge', icon: 'i-lucide-gift' },
   { label: 'ETH Faucet', to: '/faucet', icon: 'i-lucide-droplets' },
 ]
 

@@ -17,15 +17,19 @@ const student = {
 const verifiedAt = '2026-09-28T01:00:00.000Z'
 const chainId = 11_155_111
 const approvalLabAddress = '0x0000000000000000000000000000000000000a11'
+const survivorBadgeAddress = '0x0000000000000000000000000000000000000b22'
 const labRead = {
   address: approvalLabAddress, functionName: 'hasCompleted', abi: [], args: [wallet],
+}
+const badgeRead = {
+  address: survivorBadgeAddress, functionName: 'hasBadge', abi: [], args: [wallet],
 }
 
 function setup(registered = true) {
   const evidence = createInMemoryEvidenceSources()
   const progress = createInMemoryProgressStore()
   const students = createStudentRegistry(createInMemoryStudentsStore(registered ? [student] : []))
-  const verifiers = createActivityVerifiers({ approvalLabAddress })
+  const verifiers = createActivityVerifiers({ approvalLabAddress, survivorBadgeAddress })
   const verification = createActivityVerification({ students, progress, evidence, verifiers, now: () => new Date(verifiedAt) })
   return { ...verification, evidence, progress, verifiers }
 }
@@ -76,6 +80,23 @@ describe('Approval & Drain Lab Activity verification', () => {
 
   it('has exactly one verifier for every catalogue entry', () => {
     expect(Object.keys(setup().verifiers).sort()).toEqual(courseActivities.map(activity => activity.id).sort())
+  })
+})
+
+describe('Survivor Credential Activity verification', () => {
+  it('verifies only once the SurvivorBadge reports the wallet holds its badge', async () => {
+    const scenario = setup()
+    scenario.evidence.setContractRead(chainId, badgeRead, false)
+    expect(await scenario.verifyActivity('survivor-badge', wallet)).toEqual({
+      status: 'NotCompleted', message: getCourseActivity('survivor-badge')!.notCompletedMessage,
+    })
+    expect(await scenario.progress.listVerified(student.id)).toEqual([])
+
+    scenario.evidence.setContractRead(chainId, badgeRead, true)
+    expect(await scenario.verifyActivity('survivor-badge', wallet)).toEqual({ status: 'Verified', verifiedAt })
+    expect(await scenario.progress.listVerified(student.id)).toEqual([{
+      student_id: student.id, activity_type: 'survivor_badge', chain_id: chainId, verified_at: verifiedAt,
+    }])
   })
 
   it.each([

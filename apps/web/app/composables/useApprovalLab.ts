@@ -38,7 +38,6 @@ export function useApprovalLab() {
     })))
 
   const progressQuery = read('approvalLab', 'progressOf')
-  const badgeQuery = read('approvalLab', 'badgeOf')
   const drainedFinsQuery = read('drainerRound1', 'drainedAmount')
   const drainedAudQuery = read('audDrainerRound1', 'drainedAmount')
   const owedFinsRound1Query = read('drainerRound1', 'owedTo')
@@ -61,8 +60,6 @@ export function useApprovalLab() {
   const hasAnyOwed = computed(() => owedFins.value > 0n || owedAud.value > 0n)
   const balance = computed(() => asAmount(balanceQuery.data.value))
   const audBalance = computed(() => asAmount(audBalanceQuery.data.value))
-  const badgeId = computed(() => asAmount(badgeQuery.data.value))
-  const hasClaimedReward = computed(() => badgeId.value > 0n)
   const hasClaimedFaucet = computed(() => Boolean(hasClaimedQuery.data.value))
   const hasOpenLabApproval = computed(() => {
     const p = progress.value
@@ -79,7 +76,6 @@ export function useApprovalLab() {
 
   const queries = [
     progressQuery,
-    badgeQuery,
     drainedFinsQuery,
     drainedAudQuery,
     owedFinsRound1Query,
@@ -188,8 +184,6 @@ export function useApprovalLab() {
     hasAnyOwed,
     balance,
     audBalance,
-    badgeId,
-    hasClaimedReward,
     hasClaimedFaucet,
     hasOpenLabApproval,
     pendingAction,
@@ -201,7 +195,6 @@ export function useApprovalLab() {
     revokeLabApprovals,
     claimFaucet: () => runAndRefresh('faucet', { contract: 'finsToken', functionName: 'claimFaucet' }),
     completeRecovery: () => runAndRefresh('recovery', { functionName: 'completeRecovery' }),
-    claimCompletionReward: () => runAndRefresh('reward', { functionName: 'claimCompletionReward' }),
     approveRound1Lure,
     claimLure: () => runAndRefresh('lure-claim', { contract: 'fakeAirdrop', functionName: 'claim' }),
   }

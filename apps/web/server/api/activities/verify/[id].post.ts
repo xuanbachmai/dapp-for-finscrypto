@@ -21,7 +21,10 @@ export default defineEventHandler(async (event) => {
     students: createStudentRegistry(createSupabaseStudentsStore(supabase)),
     progress: createSupabaseProgressStore(supabase),
     evidence: createEthersEvidenceSources(getChainRuntime(config)),
-    verifiers: createActivityVerifiers({ approvalLabAddress: config.public.labContracts.approvalLab }),
+    verifiers: createActivityVerifiers({
+      approvalLabAddress: config.public.labContracts.approvalLab,
+      survivorBadgeAddress: config.public.labContracts.survivorBadge,
+    }),
   })
   const verdict = await verification.verifyActivity(id, body.walletAddress).catch((error: unknown) => {
     if (isError(error)) throw error

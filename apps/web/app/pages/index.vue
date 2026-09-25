@@ -1,11 +1,12 @@
 <script setup lang="ts">
 useHead({
-  title: 'FINSCRYPTO Labs',
+  title: 'FINSCRYPTO.XYZ',
 })
 
 const links = [
   { title: 'Approvals', to: '/tools/approvals', icon: 'i-lucide-shield-check', description: 'Find and revoke every open token approval on your wallet. A permanent tool, useful long after the course.' },
   { title: 'Approval & Drain Lab', to: '/labs/approval-debrief', icon: 'i-lucide-flask-conical', description: 'Debrief, progress checklist and recovery steps for the simulated drain.' },
+  { title: 'Survivor Credential', to: '/labs/survivor-badge', icon: 'i-lucide-gift', description: 'Claim the completion reward: 500 FINS and a soulbound “I Survived” badge.' },
   { title: 'Activities', to: '/activities', icon: 'i-lucide-activity', description: 'Verify completed Activities against chain state and save Progress.' },
   { title: 'Sepolia ETH', to: '/faucet', icon: 'i-lucide-droplets', description: 'Get test ETH for transaction fees from a public Sepolia faucet.' },
 ]
@@ -14,7 +15,7 @@ const links = [
 <template>
   <div class="space-y-8">
     <PageHeader
-      title="FINSCRYPTO Labs"
+      title="FINSCRYPTO.XYZ"
       eyebrow="Course companion dapp"
       description="A separately deployable risk-learning dapp using Sepolia contracts with the existing FINSCRYPTO student registry and activity-verification conventions."
     />

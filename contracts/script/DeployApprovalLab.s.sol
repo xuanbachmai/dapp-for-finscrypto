@@ -6,6 +6,7 @@ import {FINSToken} from "../src/FINSToken.sol";
 import {Drainer} from "../src/Drainer.sol";
 import {FakeAirdrop} from "../src/FakeAirdrop.sol";
 import {ApprovalLab} from "../src/ApprovalLab.sol";
+import {SurvivorBadge} from "../src/SurvivorBadge.sol";
 
 /// Deploys the Approval & Drain Lab stack to Sepolia and writes deployments/<chainId>.json.
 /// SEPOLIA_DEPLOYER_PRIVATE_KEY is used only by Foundry and must never enter the web app.
@@ -37,7 +38,10 @@ contract DeployApprovalLab is Script {
             address(audRound1),
             address(audRound2)
         );
-        token.configureCompletionMinter(address(lab));
+        // The reward is its own dapp: the badge contract reads the lab's completion and is the
+        // sole FINS completion minter.
+        SurvivorBadge badge = new SurvivorBadge(operator, address(token), address(lab));
+        token.configureCompletionMinter(address(badge));
 
         vm.stopBroadcast();
 
@@ -51,7 +55,8 @@ contract DeployApprovalLab is Script {
         vm.serializeAddress(key, "audDrainerRound1", address(audRound1));
         vm.serializeAddress(key, "audDrainerRound2", address(audRound2));
         vm.serializeAddress(key, "fakeAirdrop", address(airdrop));
-        string memory json = vm.serializeAddress(key, "approvalLab", address(lab));
+        vm.serializeAddress(key, "approvalLab", address(lab));
+        string memory json = vm.serializeAddress(key, "survivorBadge", address(badge));
 
         string memory path = string.concat("./deployments/approval-lab-", vm.toString(block.chainid), ".json");
         vm.writeJson(json, path);
@@ -64,6 +69,7 @@ contract DeployApprovalLab is Script {
         console2.log("AUD drainer r2", address(audRound2));
         console2.log("FakeAirdrop  ", address(airdrop));
         console2.log("ApprovalLab  ", address(lab));
+        console2.log("SurvivorBadge", address(badge));
         console2.log("wrote", path);
     }
 }

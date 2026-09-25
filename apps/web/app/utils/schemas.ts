@@ -49,6 +49,7 @@ export const ActivityTypeSchema = z.enum([
   'nft_mint',
   // Added: Approval & Drain Lab
   'approval_lab',
+  'survivor_badge',
 ])
 export type ActivityType = z.infer<typeof ActivityTypeSchema>
 

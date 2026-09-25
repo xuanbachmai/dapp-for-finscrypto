@@ -52,8 +52,6 @@ contract ApprovalLabTest is Test {
             address(audRound1),
             address(audRound2)
         );
-        token.configureCompletionMinter(address(lab));
-
         vm.prank(alice);
         token.claimFaucet();
         vm.prank(bob);
@@ -472,65 +470,7 @@ contract ApprovalLabTest is Test {
         assertTrue(lab.hasCompleted(alice), "round 2 is not a completion requirement");
     }
 
-    // --- completion ------------------------------------------------------------------
-
-    function testCompletionRewardMintsFiveHundredFinsAndSurvivorNftOnce() public {
-        _finishAndRecover(alice);
-        uint256 beforeBalance = token.balanceOf(alice);
-
-        vm.prank(alice);
-        lab.claimCompletionReward();
-
-        assertEq(token.balanceOf(alice), beforeBalance + 500e18, "500 FINS completion gift");
-        assertEq(lab.balanceOf(alice), 1, "one survivor NFT");
-        assertEq(lab.ownerOf(lab.badgeOf(alice)), alice);
-        assertTrue(bytes(lab.tokenURI(lab.badgeOf(alice))).length > 100, "on-chain NFT metadata exists");
-
-        vm.prank(alice);
-        vm.expectRevert(ApprovalLab.RewardAlreadyClaimed.selector);
-        lab.claimCompletionReward();
-    }
-
-    function testCompletionRewardCannotBeClaimedEarly() public {
-        vm.prank(alice);
-        vm.expectRevert(ApprovalLab.LabIncomplete.selector);
-        lab.claimCompletionReward();
-    }
-
-    function testSurvivorNftCannotBeTransferred() public {
-        _finishAndRecover(alice);
-        vm.prank(alice);
-        lab.claimCompletionReward();
-
-        uint256 badgeId = lab.badgeOf(alice);
-        vm.prank(alice);
-        vm.expectRevert(ApprovalLab.BadgeNonTransferable.selector);
-        lab.transferFrom(alice, bob, badgeId);
-    }
-
-    function testOnlyApprovalLabCanMintCompletionFins() public {
-        vm.prank(alice);
-        vm.expectRevert(FINSToken.NotCompletionMinter.selector);
-        token.mintCompletionReward(alice);
-    }
-
-    function testOperatorCanAirdropRewardWithoutAnotherStudentTransaction() public {
-        _finishAndRecover(alice);
-        uint256 beforeBalance = token.balanceOf(alice);
-
-        uint256 awarded = lab.airdropCompletionRewards(_two(alice, bob));
-
-        assertEq(awarded, 1, "incomplete wallets are skipped");
-        assertEq(token.balanceOf(alice), beforeBalance + 500e18);
-        assertEq(lab.ownerOf(lab.badgeOf(alice)), alice);
-        assertEq(lab.badgeOf(bob), 0);
-    }
-
-    function testStudentCannotRunCompletionAirdrop() public {
-        vm.prank(alice);
-        vm.expectRevert(ApprovalLab.NotOperator.selector);
-        lab.airdropCompletionRewards(_one(alice));
-    }
+    // --- completion (the reward itself lives in SurvivorBadge.t.sol) --------------------
 
     function testReapprovingAfterCompletionReadsIncomplete() public {
         _complete(alice);

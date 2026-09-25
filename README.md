@@ -1,6 +1,6 @@
-# FINSCRYPTO Labs
+# FINSCRYPTO.XYZ
 
-FINSCRYPTO Labs is a separately deployable course dapp for FINS3647/5547. It uses Ethereum Sepolia
+FINSCRYPTO.XYZ is a separately deployable course dapp for FINS3647/5547. It uses Ethereum Sepolia
 for the lab contracts and the existing FINSCRYPTO wallet, student-record and activity-verification
 conventions while keeping the approval-drain teaching experience isolated from the main website.
 
@@ -14,7 +14,8 @@ valueless `FINS` test token plus the existing Sepolia course `AUD` token at
 | Feature | Route / location |
 | --- | --- |
 | Approval scanner and revoke flow | `/tools/approvals` |
-| Approval & Drain Lab debrief, refunds and completion reward | `/labs/approval-debrief` |
+| Approval & Drain Lab debrief and refunds | `/labs/approval-debrief` |
+| Survivor Credential reward dapp (500 FINS + soulbound badge) | `/labs/survivor-badge` |
 | Classroom lure pages | `/labs/airdrop-claim`, `/labs/verify-wallet` |
 | Sepolia ETH faucet directory | `/faucet` |
 | Course activity verification | `/activities` |
@@ -26,7 +27,8 @@ Copy `.env.example` to `.env` and configure:
 
 - the shared Supabase URL, anon key and service-role key;
 - `NUXT_SEPOLIA_RPC_URL` for server-side activity verification;
-- the FINS/AUD token and drainer `NUXT_PUBLIC_*_ADDRESS` values from the Sepolia deployment;
+- the FINS/AUD token, drainer, `NUXT_PUBLIC_APPROVAL_LAB_ADDRESS` and
+  `NUXT_PUBLIC_SURVIVOR_BADGE_ADDRESS` values from the Sepolia deployment;
 - an optional WalletConnect project ID.
 
 Missing contract addresses are handled as an explicit “deployment required” state. The dapp never
@@ -65,10 +67,13 @@ current ethereum.org list. Sepolia ETH is used only for transaction fees. Draine
 native ETH so Students keep gas for revocation, refunds and reward claims. The in-lab FINS token has
 its own once-per-wallet classroom faucet and has no monetary value.
 
-After all FINS/AUD approvals are revoked and every drained token is refunded, a Student can claim
-one atomic completion airdrop: `500 FINS` plus a non-transferable “I Survived a
-Hack” ERC-721 badge. Its final SVG and metadata are generated fully on-chain. Staff can sponsor the
-reward gas for all eligible claimants by setting `LAB_OPERATOR_PRIVATE_KEY` and running:
+The completion reward is a separate dapp (`SurvivorBadge` contract, `/labs/survivor-badge` page,
+its own `survivor-badge` Activity). It reads `ApprovalLab.hasCompleted()` and is the sole FINS
+completion minter — `ApprovalLab` itself holds no reward logic. After all FINS/AUD approvals are
+revoked and every drained token is refunded, a Student can claim one atomic reward: `500 FINS`
+plus a non-transferable “I Survived” ERC-721 badge, with SVG and metadata generated fully
+on-chain. Staff can sponsor the reward gas for all eligible claimants by setting
+`LAB_OPERATOR_PRIVATE_KEY` and running:
 
 ```powershell
 $env:ACTION = "reward"

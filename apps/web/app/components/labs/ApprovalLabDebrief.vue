@@ -15,8 +15,6 @@ const {
   hasAnyOwed,
   balance,
   audBalance,
-  badgeId,
-  hasClaimedReward,
   hasClaimedFaucet,
   hasOpenLabApproval,
   pendingAction,
@@ -29,7 +27,6 @@ const {
   completeRecovery,
   claimRefund,
   revokeLabApprovals,
-  claimCompletionReward,
 } = useApprovalLab()
 const { switchChain } = useWallet()
 
@@ -45,7 +42,7 @@ const steps = computed(() => {
     { key: 'drained', done: Boolean(p?.drained), title: 'Round 1: you signed the approval and were drained', detail: 'The only step you complete by failing.' },
     { key: 'revoked', done: Boolean(p?.revoked), title: 'Recovery: revoke every lab approval, then confirm', detail: 'Your exposure time runs from the drain to this confirmation.' },
     { key: 'fundsRecovered', done: Boolean(p?.fundsRecovered), title: 'Recovery: take every FINS and AUD token back', detail: p?.fundsRecovered ? 'The lab no longer owes you any tokens.' : 'Sepolia ETH stays in your wallet so you can pay for this recovery transaction.' },
-    { key: 'complete', done: Boolean(p?.complete), title: 'Complete: collect your reward and verify', detail: p?.complete ? `Exposure: ${p.secondsExposed} seconds between the drain and your confirmed revoke.` : 'Every lab allowance must be zero and every drained token returned.' },
+    { key: 'complete', done: Boolean(p?.complete), title: 'Complete: verify, then claim your Survivor credential', detail: p?.complete ? `Exposure: ${p.secondsExposed} seconds between the drain and your confirmed revoke. Your reward is a separate dapp.` : 'Every lab allowance must be zero and every drained token returned.' },
   ]
 })
 </script>
@@ -199,16 +196,8 @@ const steps = computed(() => {
               </div>
 
               <div v-if="step.key === 'complete' && step.done" class="mt-3 flex flex-wrap gap-2">
-                <UButton
-                  v-if="!hasClaimedReward"
-                  size="sm"
-                  icon="i-lucide-gift"
-                  label="Claim 500 FINS + survivor NFT"
-                  :loading="pendingAction === 'reward'"
-                  :disabled="pendingAction !== null"
-                  @click="void claimCompletionReward()"
-                />
                 <UButton to="/activities" size="sm" variant="outline" icon="i-lucide-badge-check" label="Verify Activity" />
+                <UButton to="/labs/survivor-badge" size="sm" icon="i-lucide-gift" label="Claim your Survivor credential" />
               </div>
             </div>
           </li>
@@ -219,26 +208,20 @@ const steps = computed(() => {
         <div class="grid items-center gap-6 md:grid-cols-[minmax(220px,360px)_1fr]">
           <img
             src="/nft/i-survived-a-hack.png"
-            alt="I Survived a Hack FINSCRYPTO Labs completion badge"
+            alt="I Survived FINSCRYPTO.XYZ completion badge"
             class="aspect-square w-full border border-white/10 bg-white object-cover"
           >
           <div>
-            <p class="text-xs uppercase tracking-[0.18em] text-primary">Completion airdrop</p>
-            <h2 class="mt-2 text-2xl font-semibold text-white">I Survived a Hack</h2>
+            <p class="text-xs uppercase tracking-[0.18em] text-primary">Completion reward · separate dapp</p>
+            <h2 class="mt-2 text-2xl font-semibold text-white">I Survived</h2>
             <p class="mt-2 text-sm leading-6 text-gray-400">
-              Your reward transaction mints 500 valueless course FINS and a non-transferable Sepolia NFT. The NFT metadata and final artwork are stored fully on-chain.
-            </p>
-            <p v-if="hasClaimedReward" class="mt-4 text-sm font-medium text-emerald-300">
-              Reward claimed · survivor badge #{{ badgeId }}
+              You finished the lab. The reward — 500 valueless course FINS and a non-transferable Sepolia badge with fully on-chain artwork — is claimed from its own Survivor Credential dapp.
             </p>
             <UButton
-              v-else
               class="mt-4"
+              to="/labs/survivor-badge"
               icon="i-lucide-gift"
-              label="Claim completion airdrop"
-              :loading="pendingAction === 'reward'"
-              :disabled="pendingAction !== null"
-              @click="void claimCompletionReward()"
+              label="Go to the Survivor Credential"
             />
           </div>
         </div>

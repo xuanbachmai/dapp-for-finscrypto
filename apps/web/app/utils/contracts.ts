@@ -5,6 +5,7 @@ import { courseAudAbi } from './abis/courseAud'
 import { drainerAbi } from './abis/drainer'
 import { fakeAirdropAbi } from './abis/fakeAirdrop'
 import { finsTokenAbi } from './abis/finsToken'
+import { survivorBadgeAbi } from './abis/survivorBadge'
 
 export const labContractNames = [
   'finsToken',
@@ -15,6 +16,7 @@ export const labContractNames = [
   'audDrainerRound2',
   'fakeAirdrop',
   'approvalLab',
+  'survivorBadge',
 ] as const
 
 export type LabContractName = (typeof labContractNames)[number]
@@ -36,6 +38,7 @@ const abis: Record<LabContractName, Abi> = {
   audDrainerRound2: drainerAbi as Abi,
   fakeAirdrop: fakeAirdropAbi as Abi,
   approvalLab: approvalLabAbi as Abi,
+  survivorBadge: survivorBadgeAbi as Abi,
 }
 
 /**
