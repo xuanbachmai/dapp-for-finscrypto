@@ -3,6 +3,7 @@ node_modules/
 .env.dev
 *.log
 .DS_Store
+*.v1.bak
 
 # nuxt
 .nuxt/
@@ -14,17 +15,5 @@ dist/
 supabase/.temp/
 supabase/.branches/
 
-# local backups
-*.v1.bak
-
-# superseded Next.js/Hardhat prototype (kept locally, not published)
-_prototype/
-
 # local editor/agent tooling
 .claude/
-
-# stray artifacts from unrelated tasks (kept on disk, not part of this repo)
-/outputs/
-/build_revision_pack.mjs
-/inspect_course_files.mjs
-/inspect_model_controls.mjs
