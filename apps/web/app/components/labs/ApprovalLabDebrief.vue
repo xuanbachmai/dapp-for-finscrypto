@@ -207,7 +207,7 @@ const steps = computed(() => {
       <UCard v-if="progress?.complete" class="overflow-hidden border border-white/10 bg-slate-950/70">
         <div class="grid items-center gap-6 md:grid-cols-[minmax(220px,360px)_1fr]">
           <img
-            src="/nft/i-survived-a-hack.png"
+            src="/nft/i-survived.png"
             alt="I Survived FINSCRYPTO.XYZ completion badge"
             class="aspect-square w-full border border-white/10 bg-white object-cover"
           >

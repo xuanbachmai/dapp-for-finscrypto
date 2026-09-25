@@ -60,7 +60,7 @@ const explorerBase = 'https://sepolia.etherscan.io'
         <UCard class="border border-white/10 bg-slate-950/70">
           <div class="grid gap-6 md:grid-cols-[280px_1fr] md:items-center">
             <img
-              src="/nft/i-survived-a-hack.png"
+              src="/nft/i-survived.png"
               alt="I Survived FINSCRYPTO.XYZ completion badge"
               class="mx-auto w-full max-w-[280px] rounded-2xl border border-white/10"
             >
